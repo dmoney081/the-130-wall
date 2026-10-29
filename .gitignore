@@ -1,0 +1,5 @@
+.lemonsqueezy_key
+*.key
+.env
+admin/inbox/
+__pycache__/

@@ -1,0 +1,11 @@
+{
+  "goal_usd": 130,
+  "deadline_iso": "2026-11-23T23:59:00-06:00",
+  "kofi_url": "https://ko-fi.com/secretwall",
+  "kofi_amount_deeplink": false,
+  "claim_email": "secretwall@mail.grokbot.com",
+  "cols": 10,
+  "rows": 5,
+  "tier_size": 10,
+  "tier_prices": [1, 2, 3, 4, 5]
+}
