@@ -1,23 +1,43 @@
 (async function(){
   const bust = '?v=' + Date.now();
-  const [cfg, board] = await Promise.all([
+  const mq = new URLSearchParams(location.search).get('m');
+  const want = /^\d{4}-\d{2}$/.test(mq||'') ? mq : null;
+  const [cfg, live, months] = await Promise.all([
     fetch('config.json'+bust).then(r=>r.json()),
-    fetch('board.json'+bust).then(r=>r.json())
+    fetch('board.json'+bust).then(r=>r.json()),
+    fetch('boards/index.json'+bust).then(r=>r.ok?r.json():[]).catch(()=>[])
   ]);
+  let board = live, archived = false;
+  if (want && want !== live.month && months.includes(want)){
+    const r = await fetch(`boards/${want}.json`+bust).catch(()=>null);
+    if (r && r.ok){ board = await r.json(); archived = true; }
+  }
   const N = cfg.cols * cfg.rows;
   const tiles = board.tiles || [];
   const byPos = {}; tiles.forEach(t => byPos[t.pos] = t);
-  const sold = tiles.length;
-  const raised = tiles.reduce((s,t)=>s+(+t.paid||0),0) + (+board.tips_usd||0);
+  const paidTiles = tiles.filter(t => !t.member);           // member perk tiles (paid 0) never count
+  const sold = paidTiles.length;
+  const raised = paidTiles.reduce((s,t)=>s+(+t.paid||0),0) + (+board.tips_usd||0);
   const priceAt = k => cfg.tier_prices[Math.min(Math.floor(k/cfg.tier_size), cfg.tier_prices.length-1)];
-  const next = sold < N ? priceAt(sold) : null;
+  const next = (!archived && tiles.length < N) ? priceAt(sold) : null;
   const $ = id => document.getElementById(id);
+  // month + theme, and past walls
+  const mname = m => m ? new Date(m+'-15').toLocaleString([], {month:'long', year:'numeric'}) : '';
+  const mt = $('monththeme');
+  if (mt) mt.textContent = (archived ? 'Archived wall: ' : 'This month: ') + mname(board.month) + (board.theme ? ' · ' + board.theme : '');
+  const pw = $('pastwalls');
+  if (pw){
+    const list = [...new Set(months)].filter(m => m !== live.month).sort().reverse();
+    pw.innerHTML = (archived ? '<a href="./">← Live wall</a>' : '') +
+      (list.length ? (archived ? ' · ' : '') + 'Past walls: ' + list.map(m => m===board.month ? `<b>${esc(mname(m))}</b>` : `<a href="?m=${esc(m)}">${esc(mname(m))}</a>`).join(' · ')
+                   : (archived ? '' : 'Past walls appear here when a month closes.'));
+  }
   const money = v => '$' + (Math.round(v*100)/100).toString().replace(/\.(\d)$/,'.$10');
 
   // progress
   $('raised').textContent = money(raised);
   $('sold').textContent = sold;
-  $('nextprice').textContent = next ? '$'+next : 'sold out';
+  $('nextprice').textContent = next ? '$'+next : (archived ? 'closed' : 'sold out');
   requestAnimationFrame(()=> $('fill').style.width = Math.min(100, raised/cfg.goal_usd*100) + '%');
   $('updated').textContent = 'wall updated ' + new Date(board.updated).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
   const kofi = cfg.kofi_url || 'https://ko-fi.com/secretwall';
@@ -41,11 +61,11 @@
     el.className = 'tile';
     const t = byPos[p];
     if (t){
-      el.classList.add('sold');
+      el.classList.add('sold'); if (t.member) el.classList.add('member');
       el.style.background = t.color || '#333';
       el.innerHTML = (t.pixel ? `<img class="px" src="${esc(t.pixel)}" alt="">` : `<span class="e">${esc(t.emoji||'■')}</span>`) +
-        `<span class="t">${esc(t.text||'')}</span>` + (t.crown ? '<span class="crown">👑</span>' : '');
-      el.title = `${t.text||''}${t.handle ? ' by '+t.handle : ''} · ${money(t.paid)}`;
+        `<span class="t">${esc(t.text||'')}</span>` + (t.crown ? '<span class="crown">👑</span>' : '') + (t.member ? '<span class="mb" title="Member tile">M</span>' : '');
+      el.title = `${t.text||''}${t.handle ? ' by '+t.handle : ''} · ${t.member ? 'member tile (not counted in the total)' : money(t.paid)}`;
     } else {
       el.innerHTML = `<span class="p">${next ? '$'+next : '·'}</span>`;
       if (next) el.onclick = () => openClaim(p);
@@ -54,11 +74,21 @@
   }
 
   // ledger
-  const led = [...tiles].sort((a,b)=> new Date(b.ts) - new Date(a.ts));
-  if (led.length){
+  const led = [...paidTiles].sort((a,b)=> new Date(b.ts) - new Date(a.ts));
+  if (led.length || board.tips_usd){
     $('ledger').innerHTML = led.map(t => `<li><span>${esc(t.emoji||'')} Tile ${t.pos+1}${t.handle?' · '+esc(t.handle):''}${safeLink(t.link)}</span><span>${money(t.paid)}</span></li>`).join('') +
       (board.tips_usd ? `<li><span>Tips</span><span>${money(board.tips_usd)}</span></li>` : '');
   }
+
+  const mem = tiles.filter(t => t.member);
+  if (mem.length && $('ledger')) $('ledger').insertAdjacentHTML('beforeend', `<li class="muted"><span>${mem.length} member tile${mem.length>1?'s':''} (★ M badge)</span><span>$0, not counted</span></li>`);
+
+  // supporters
+  fetch('credits.json'+bust).then(r=>r.ok?r.json():[]).then(c => {
+    const el = $('supporters'); if (!el) return;
+    el.innerHTML = c.length ? c.map(x => `<li>${esc(x.name)} <span class="muted">· ${esc(x.tier||'')}${x.since?' since '+esc(x.since):''}</span></li>`).join('')
+                            : '<li class="muted">No members yet. You could be the first.</li>';
+  }).catch(()=>{});
 
   // claim dialog (Ko-fi flow)
   const dlg = $('claim'); let cur = null;

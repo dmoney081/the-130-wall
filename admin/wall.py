@@ -8,6 +8,9 @@ message into the Ko-fi message box; Ko-fi emails a payment notification to secre
   wall.py add --pos 12 --emoji 🐸 --color '#33ff99' --text 'hi mom' --handle @x --link x.com --paid 1 --code S-ABCD
   wall.py tip 2.50
   wall.py pixel S-ABCD assets/px/S-ABCD.png              # attach the custom pixel icon to a tile
+  wall.py member --pos 7 --emoji 🌙 --text 'hi' --handle @x   # member perk tile: paid 0, never counts toward the total
+  wall.py archive --theme 'Spooky pixels' [--month 2026-11]  # copy board.json to boards/<month>.json, start a fresh board
+  wall.py --board boards/2026-10.json status             # any command can target another board file
   wall.py publish                                        # git add/commit/push (only after owner approves hosting)
 """
 import argparse, json, re, subprocess, sys, datetime, pathlib
@@ -18,11 +21,12 @@ N = CFG['cols'] * CFG['rows']
 BLOCK = re.compile(r'(https?://|www\.|\.com\b|nigg|fag|retard|kike|porn|onlyfans|nazi|kill yourself|kys)', re.I)
 
 def load(): return json.loads(BOARD_P.read_text())
+def paid_tiles(b): return [t for t in b['tiles'] if not t.get('member')]
 def save(b):
     b['updated'] = datetime.datetime.now().astimezone().isoformat(timespec='seconds')
     BOARD_P.write_text(json.dumps(b, ensure_ascii=False, indent=2) + '\n')
 def price_at(k): return CFG['tier_prices'][min(k // CFG['tier_size'], len(CFG['tier_prices']) - 1)]
-def raised(b): return sum(float(t['paid']) for t in b['tiles']) + float(b.get('tips_usd', 0))
+def raised(b): return sum(float(t['paid']) for t in paid_tiles(b)) + float(b.get('tips_usd', 0))  # member tiles never count
 
 CODE_RE = re.compile(r'\bS-[A-HJ-NP-Z2-9]{4}\b', re.I)
 KEYS = r'(CLAIM|code|tile|price|emoji|color|text|handle|name|link|pixel)'
@@ -59,13 +63,43 @@ def nearest_free(b, want):
     return min(free, key=lambda p: abs(p // cols - wr) + abs(p % cols - wc)) if free else None
 
 def cmd_status(a):
-    b = load(); k = len(b['tiles'])
-    print(f"raised ${raised(b):.2f} / ${CFG['goal_usd']} | tiles {k}/{N} | next price ${price_at(k) if k < N else '-'} | tips ${b.get('tips_usd',0)}")
-    for t in b['tiles']: print(f"  #{t['pos']+1:>2} {t.get('emoji','')} {t.get('text','')!r} {t.get('handle','')} ${t['paid']} {t.get('code','')}")
+    b = load(); k = len(paid_tiles(b)); m = len(b['tiles']) - k
+    print(f"[{BOARD_P.name}] month {b.get('month','?')} theme {b.get('theme','')!r}")
+    print(f"raised ${raised(b):.2f} / ${CFG['goal_usd']} | paid tiles {k}, member tiles {m}, {len(b['tiles'])}/{N} used | next price ${price_at(k) if len(b['tiles']) < N else '-'} | tips ${b.get('tips_usd',0)}")
+    for t in b['tiles']: print(f"  #{t['pos']+1:>2} {t.get('emoji','')} {t.get('text','')!r} {t.get('handle','')} ${t['paid']} {'MEMBER' if t.get('member') else t.get('code','')}")
+
+def cmd_member(a):
+    b = load()
+    if len(b['tiles']) >= N: sys.exit('wall is full')
+    text = (a.text or '')[:24]; handle = (a.handle or '')[:30]
+    if BLOCK.search(text + ' ' + handle): sys.exit('rejected by content rules')
+    color = a.color if a.color and re.fullmatch(r'#[0-9a-fA-F]{6}', a.color) else '#9b7bff'
+    want = (a.pos - 1) if a.pos else N - 1
+    p = nearest_free(b, max(0, min(N - 1, want)))
+    before = raised(b)
+    b['tiles'].append({'pos': p, 'emoji': (a.emoji or '★')[:8], 'color': color, 'text': text, 'handle': handle,
+        'paid': 0, 'member': True, 'ts': datetime.datetime.now().astimezone().isoformat(timespec='seconds')})
+    save(b); assert raised(b) == before
+    print(f'member tile #{p+1} added; raised unchanged at ${before:.2f}')
+
+def cmd_archive(a):
+    b = load()
+    month = a.month or b.get('month') or datetime.date.today().strftime('%Y-%m')
+    if not re.fullmatch(r'\d{4}-\d{2}', month): sys.exit('month must be YYYY-MM')
+    dst = ROOT/'boards'/f'{month}.json'
+    if dst.exists() and not a.force: sys.exit(f'{dst} exists (use --force)')
+    dst.parent.mkdir(exist_ok=True); b['month'] = month; b['archived'] = True
+    dst.write_text(json.dumps(b, ensure_ascii=False, indent=2) + '\n')
+    y, mo = map(int, month.split('-')); nxt = a.next or f'{y + mo // 12}-{mo % 12 + 1:02d}'
+    idx = ROOT/'boards'/'index.json'
+    months = sorted(set((json.loads(idx.read_text()) if idx.exists() else []) + [month]))
+    idx.write_text(json.dumps(months) + '\n')
+    save({'month': nxt, 'theme': a.theme, 'updated': '', 'tips_usd': 0, 'tiles': []})
+    print(f'archived {month} -> {dst.relative_to(ROOT)} (raised ${raised(b):.2f}); new board {nxt} theme {a.theme!r}')
 
 def cmd_add(a):
-    b = load(); k = len(b['tiles'])
-    if k >= N: sys.exit('wall is full')
+    b = load(); k = len(paid_tiles(b))
+    if len(b['tiles']) >= N: sys.exit('wall is full')
     d = parse_claim(pathlib.Path(a.claim_file).read_text()) if a.claim_file else {}
     for f in ('emoji','color','text','handle','code','pixel','link','tile','price'):
         v = getattr(a, f, None)
@@ -201,7 +235,7 @@ def cmd_publish(a):
     subprocess.run(['git', '-C', str(ROOT), 'commit', '-m', a.msg or 'wall update'], check=False)
     subprocess.run(['git', '-C', str(ROOT), 'push'], check=True)
 
-ap = argparse.ArgumentParser(); sp = ap.add_subparsers(dest='cmd', required=True)
+ap = argparse.ArgumentParser(); ap.add_argument('--board', help='board file (default board.json)'); sp = ap.add_subparsers(dest='cmd', required=True)
 sp.add_parser('status').set_defaults(f=cmd_status)
 x = sp.add_parser('add'); x.set_defaults(f=cmd_add)
 x.add_argument('--claim-file'); x.add_argument('--pos', type=int); x.add_argument('--zero', action='store_true', help='--pos is 0-based')
@@ -211,5 +245,13 @@ x = sp.add_parser('tip'); x.add_argument('amount', type=float); x.add_argument('
 x = sp.add_parser('kofi', help='parse one Ko-fi payment notification email'); x.set_defaults(f=cmd_kofi)
 x.add_argument('--email-file', required=True); x.add_argument('--apply', action='store_true'); x.add_argument('--force', action='store_true')
 x = sp.add_parser('pixel'); x.add_argument('code'); x.add_argument('path'); x.set_defaults(f=cmd_pixel)
+x = sp.add_parser('member', help='add a member perk tile (paid 0, not counted)'); x.set_defaults(f=cmd_member)
+x.add_argument('--pos', type=int, help='1-based'); [x.add_argument('--'+f) for f in ('emoji','color','text','handle')]
+x = sp.add_parser('archive', help='freeze board to boards/YYYY-MM.json and start a fresh one'); x.set_defaults(f=cmd_archive)
+x.add_argument('--theme', required=True); x.add_argument('--month'); x.add_argument('--next'); x.add_argument('--force', action='store_true')
 x = sp.add_parser('publish'); x.add_argument('-m', '--msg'); x.set_defaults(f=cmd_publish)
-a = ap.parse_args(); a.f(a)
+a = ap.parse_args()
+if a.board:
+    BOARD_P = pathlib.Path(a.board)
+    if not BOARD_P.is_absolute(): BOARD_P = (pathlib.Path.cwd()/BOARD_P) if BOARD_P.exists() else ROOT/BOARD_P
+a.f(a)
