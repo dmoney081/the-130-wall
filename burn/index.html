@@ -54,7 +54,7 @@
 <script>
 fetch('../credits.json?v='+Date.now()).then(r=>r.ok?r.json():[]).then(c=>{
   const e=s=>String(s).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
-  document.getElementById('credit-list').innerHTML=c.length?c.map(x=>`<li>${e(x.name)}${x.tier?' · '+e(x.tier):''}${x.since?' · since '+e(x.since):''}</li>`).join(''):'<li>No supporters listed yet. Memberships are coming back soon; meanwhile you can <a href="https://secretwall.itch.io/burn-rate/donate" target="_blank" rel="noopener">tip on itch.io</a>.</li>';
+  document.getElementById('credit-list').innerHTML=c.length?c.map(x=>`<li>${e(x.name)}${x.tier?' · '+e(x.tier):''}${x.since?' · since '+e(x.since):''}</li>`).join(''):'<li>No supporters listed yet. You can <a href="https://secretwall.itch.io/burn-rate/donate" target="_blank" rel="noopener">tip any amount on itch.io</a>.</li>';
 }).catch(()=>{document.getElementById('credit-list').innerHTML='<li>Credits unavailable right now.</li>';});
 </script>
 </body>

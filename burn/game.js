@@ -141,7 +141,8 @@ function finish(last){
   $('share').value=share;
   $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(share)}catch(_){const t=$('share');t.select();document.execCommand('copy')}$('copy').textContent='Copied \u2713'};
   if($('sh-ch'))$('sh-ch').onclick=async()=>{const u=challengeUrl(S.cash);const n=$('ch-note');n.querySelector('.chlink').textContent=u;n.hidden=false;
-    try{await navigator.clipboard.writeText(u);$('sh-ch').textContent='Link copied \u2713'}catch(_){$('sh-ch').textContent='Copy the link below'}};
+    let ok=false;try{await navigator.clipboard.writeText(u);ok=true}catch(_){try{const t=document.createElement('textarea');t.value=u;document.body.appendChild(t);t.select();ok=document.execCommand('copy');t.remove()}catch(_){}}
+    $('sh-ch').textContent=ok?'Link copied \u2713':'Copy the link below';if(!ok)n.firstChild.textContent=n.firstChild.textContent.replace('Link copied.','Copy this link and send it.');};
   $('again').onclick=()=>start(false);$('rush2').onclick=()=>start(false,true);if($('daily2'))$('daily2').onclick=()=>start(true);
   const cv=$('card');drawCard(cv,{label,won,cash:S.cash,day:dd,trail:S.trail,title:vv[0],streak:st,date:today()});
   const fname='burn-rate-'+(daily?runNo():rush?'rush':'random')+'.png';
