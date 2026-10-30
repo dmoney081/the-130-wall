@@ -4,7 +4,7 @@ const GOAL=130, DAYS=25, HOME='https://dmoney081.github.io/the-130-wall/', SITE=
 // Same file runs on the site, on itch.io (absolute links) and on game portals (BURN_PORTAL: no outside links at all).
 const PORTAL=!!window.BURN_PORTAL, ONSITE=/dmoney081\.github\.io\/the-130-wall\//.test(location.href)||/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
 const BASE=ONSITE?'../':HOME, TGT=ONSITE?'':' target="_blank" rel="noopener"';
-const KOFI='https://ko-fi.com/secretwall', TIERS=KOFI+'/tiers', RUSH_MS=6000;
+const TIP='https://secretwall.itch.io/burn-rate/donate', RUSH_MS=6000;
 function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function hash(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -157,8 +157,7 @@ function showReal(won){
     $('real').innerHTML='<b>Liked it? Put your score on The $130 Wall.</b> '+
       'Claim a tile from $1 with your result on it, and it stays up on the wall for good.'+
       '<div class="row" style="margin-top:10px"><a class="btn" href="'+BASE+'?tile='+tile+'"'+TGT+'>Put my score on a tile</a>'+
-      '<a class="btn ghost" href="'+KOFI+'" target="_blank" rel="noopener">Tip on Ko-fi</a>'+
-      '<a class="btn ghost" href="'+TIERS+'" target="_blank" rel="noopener">Memberships from $3/mo</a></div>'+
+      '<a class="btn ghost" href="'+TIP+'" target="_blank" rel="noopener">Tip any amount on itch.io</a></div>'+
       '<p class="small" style="margin:8px 0 0">Totally optional. The game stays free, with no ads and no tracking. Waiting for tomorrow\'s deck? <a href="'+BASE+'hire/#toy"'+TGT+'>Hatch a free Pixel Pal from your name</a>.</p>';
   }).catch(function(){});
 }

@@ -48,12 +48,12 @@
     <ul id="credit-list"><li>Loading…</li></ul>
   </details>
 </main>
-<footer>BURN RATE is free. Made with AI tools by Secret, also home of <a href="../">The $130 Wall</a>. Like it? <a href="https://ko-fi.com/secretwall" target="_blank" rel="noopener">Tip on Ko-fi</a> · <a href="https://ko-fi.com/secretwall/tiers" target="_blank" rel="noopener">Memberships</a> · <a href="../kit/">Wall Kit</a> · <a href="../hire/">Pixel avatars &amp; tiny sites</a> · <a href="../hire/#toy">Free Pixel Pal maker</a></footer>
+<footer>BURN RATE is free. Made with AI tools by Secret, also home of <a href="../">The $130 Wall</a>. Like it? <a href="https://secretwall.itch.io/burn-rate/donate" target="_blank" rel="noopener">Tip on itch.io</a> · <a href="../kit/">Wall Kit</a> · <a href="../hire/">Pixel avatars &amp; tiny sites</a> · <a href="../hire/#toy">Free Pixel Pal maker</a></footer>
 <script src="game.js"></script>
 <script>
 fetch('../credits.json?v='+Date.now()).then(r=>r.ok?r.json():[]).then(c=>{
   const e=s=>String(s).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
-  document.getElementById('credit-list').innerHTML=c.length?c.map(x=>`<li>${e(x.name)}${x.tier?' · '+e(x.tier):''}${x.since?' · since '+e(x.since):''}</li>`).join(''):'<li>No supporters yet. Be the first on <a href="https://ko-fi.com/secretwall" target="_blank" rel="noopener">Ko-fi</a>.</li>';
+  document.getElementById('credit-list').innerHTML=c.length?c.map(x=>`<li>${e(x.name)}${x.tier?' · '+e(x.tier):''}${x.since?' · since '+e(x.since):''}</li>`).join(''):'<li>No supporters listed yet. Memberships are coming back soon; meanwhile you can <a href="https://secretwall.itch.io/burn-rate/donate" target="_blank" rel="noopener">tip on itch.io</a>.</li>';
 }).catch(()=>{document.getElementById('credit-list').innerHTML='<li>Credits unavailable right now.</li>';});
 </script>
 </body>

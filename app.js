@@ -40,10 +40,11 @@
   $('nextprice').textContent = next ? '$'+next : (archived ? 'closed' : 'sold out');
   requestAnimationFrame(()=> $('fill').style.width = Math.min(100, raised/cfg.goal_usd*100) + '%');
   $('updated').textContent = 'wall updated ' + new Date(board.updated).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
-  const kofi = cfg.kofi_url || 'https://ko-fi.com/secretwall';
-  // Ko-fi has no documented amount parameter, so by default we link the plain page and state the amount.
-  const kofiFor = amt => cfg.kofi_amount_deeplink ? `${kofi}/${amt}` : kofi;
-  $('tiplink').href = kofi;
+  // Payments: itch.io donate page (PayPal checkout, $3 prefilled, quick buttons $1/$2/$5/$10).
+  // It has no amount URL parameter, so we link the page and state the amount to pay.
+  const payUrl = cfg.pay_url || 'https://secretwall.itch.io/burn-rate/donate';
+  const claimEmail = cfg.claim_email || 'secretwall@mail.grokbot.com';
+  $('tiplink').href = payUrl;
   if (next && $('cta-claim')) $('cta-claim').textContent = `Claim a tile for $${next}`; else if ($('cta-claim')) $('cta-claim').textContent = 'See the wall';
 
   // header status (tiles left; no countdown)
@@ -115,19 +116,21 @@
     if (pf){ pf.textContent = `Your Burn Rate score “${(preEmoji+' '+preText).trim()}” is ready. Tap any empty tile below and it's filled in. You can change it before you tip.`; pf.hidden = false; requestAnimationFrame(() => pf.scrollIntoView({block:'start'})); }
   }
 
-  // claim dialog (Ko-fi flow)
+  // claim dialog: 1) pay the tile price on itch.io, 2) email the tile details (prefilled mailto with the claim code)
   const dlg = $('claim'); let cur = null;
   const code = () => 'S-' + Array.from(crypto.getRandomValues(new Uint8Array(4)), b => 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'[b%31]).join('');
   const clean = v => String(v||'').replace(/[|\r\n]+/g,' ').trim();
+  const howToPay = amt => amt === 3 ? ' (already filled in)' : [1,2,5,10].includes(amt) ? ` (tap the $${amt} button)` : ` (type ${amt} as the amount)`;
   function openClaim(p){
     cur = {pos:p, code:code()};
     $('c-tile').textContent = '#'+(p+1);
     $('c-price').textContent = $('c-price2').textContent = $('c-price3').textContent = '$'+next;
-    $('c-custom').textContent = [1,3,5].includes(next) ? ` (tap the $${next} button)` : ` (type ${next} in "or enter an amount")`;
-    $('c-code').textContent = $('c-code2').textContent = cur.code;
+    $('c-custom').textContent = howToPay(next);
+    $('c-code').textContent = cur.code;
     $('pixrow').style.display = next >= 3 ? '' : 'none';
-    $('c-pay').href = kofiFor(next);
-    $('c-copy').textContent = '1 · Copy claim message';
+    $('c-pay').href = payUrl;
+    $('c-mail').textContent = '2 · Email my tile details';
+    $('c-copy').textContent = 'Copy';
     if (preText){ $('f-text').value = preText; if (preEmoji) $('f-emoji').value = preEmoji; preText = ''; }
     refresh(); dlg.showModal();
   }
@@ -138,22 +141,33 @@
     opt.forEach(([k,id]) => { const v = clean($(id).value); if (v) parts.push(`${k} ${v}`); });
     return parts.join(' | ');
   }
+  function mailBody(){
+    const payer = clean($('f-payer').value);
+    return [claimText(), '',
+      `Amount: $${next} (paid on itch.io: ${payUrl})`,
+      `Paid as: ${payer || '(name or email on your PayPal payment)'}`, '',
+      'My tile goes up once the payment is matched, usually within a day.'].join('\n');
+  }
+  function mailHref(){
+    return `mailto:${claimEmail}?subject=${encodeURIComponent('Tile claim '+cur.code)}&body=${encodeURIComponent(mailBody())}`;
+  }
   function refresh(){
     const pv = $('c-preview');
     pv.style.background = $('f-color').value;
     pv.querySelector('.e').textContent = $('f-emoji').value || '■';
     pv.querySelector('.t').textContent = $('f-text').value;
-    const msg = claimText();
-    $('c-msg').value = msg;
-    $('c-len').textContent = `${msg.length}/280` + (msg.length > 280 ? ' (too long for Ko-fi, shorten something)' : '');
-    $('c-mail').href = `mailto:${cfg.claim_email}?subject=${encodeURIComponent('Tile claim '+cur.code)}&body=${encodeURIComponent(msg)}`;
+    $('c-msg').value = mailBody();
+    $('c-len').textContent = '';
+    $('c-mail').href = mailHref();
   }
-  ['f-emoji','f-color','f-text','f-handle','f-link','f-pixel'].forEach(id => $(id).addEventListener('input', refresh));
+  ['f-emoji','f-color','f-text','f-handle','f-link','f-pixel','f-payer'].forEach(id => $(id).addEventListener('input', refresh));
+  $('c-pay').addEventListener('click', () => { $('c-mail').textContent = '2 · Now email my tile details'; });
+  $('c-mail').addEventListener('click', () => { refresh(); $('c-mail').textContent = 'Email opened ✓ (no mail app? copy the details below)'; });
   $('c-copy').onclick = async () => {
-    const msg = claimText();
+    const msg = mailBody();
     try { await navigator.clipboard.writeText(msg); }
     catch(e){ const ta = $('c-msg'); ta.focus(); ta.select(); try { document.execCommand('copy'); } catch(_){} }
-    $('c-copy').textContent = 'Copied ✓ Now tip on Ko-fi';
+    $('c-copy').textContent = 'Copied ✓';
   };
   $('c-msg').addEventListener('focus', e => e.target.select());
 

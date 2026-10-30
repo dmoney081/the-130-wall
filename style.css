@@ -85,3 +85,7 @@ dialog::backdrop{background:rgba(0,0,0,.7)}
 .wallwrap{scroll-margin-top:70px}
 @media(max-width:720px){.pitch{gap:6px;margin:12px 0}.pitch li{padding:8px 12px}.pitch span{font-size:14px}.cta .btn{padding:10px 14px;font-size:14px}.sub{font-size:16px}}
 .prefill{scroll-margin-top:70px}
+.btn.mini{display:inline-block;padding:4px 10px;font-size:13px;margin-left:8px;vertical-align:middle}
+.howto{margin:0}
+.mcard.soon{opacity:.7;cursor:default}
+.mcard.soon:hover{border-color:var(--line);transform:none}

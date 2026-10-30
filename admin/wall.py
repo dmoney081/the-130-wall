@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Ops CLI for the $130 Wall. Payments are Ko-fi tips (https://ko-fi.com/secretwall). Buyers paste a claim
-message into the Ko-fi message box; Ko-fi emails a payment notification to secretwall@mail.grokbot.com.
+"""Ops CLI for the $130 Wall. Payments go through the itch.io donate page (https://secretwall.itch.io/burn-rate/donate,
+PayPal checkout). Buyers pay the tile price there, then email their claim (subject "Tile claim S-XXXX", first line
+is the one-line claim) to secretwall@mail.grokbot.com. Match the payment notification to the claim email, then `add`.
+(Ko-fi was the old checkout; it is offline. The `kofi` subcommand name is kept as an alias of `payment`.)
 
   wall.py status
-  wall.py kofi --email-file mail.txt [--apply]           # parse a Ko-fi payment email; dry run unless --apply
-  wall.py add --claim-file claim.txt --paid 3            # claim text = Ko-fi message or claim email body
+  wall.py payment --email-file mail.txt [--apply]        # parse a payment notification email; dry run unless --apply
+  wall.py add --claim-file claim.txt --paid 3            # claim text = claim email body (first line is the claim)
   wall.py add --pos 12 --emoji 🐸 --color '#33ff99' --text 'hi mom' --handle @x --link x.com --paid 1 --code S-ABCD
   wall.py tip 2.50
   wall.py pixel S-ABCD assets/px/S-ABCD.png              # attach the custom pixel icon to a tile
@@ -32,7 +34,7 @@ CODE_RE = re.compile(r'\bS-[A-HJ-NP-Z2-9]{4}\b', re.I)
 KEYS = r'(CLAIM|code|tile|price|emoji|color|text|handle|name|link|pixel)'
 
 def parse_claim(txt):
-    """Parse a claim. Accepts the site's one-line Ko-fi format
+    """Parse a claim. Accepts the site's one-line claim format
          S-7Q4K | tile 12 | price $3 | emoji 🦊 | color #ff4f9a | text hi mom | name @you | link x.com | pixel frog
        and the older multi-line `key: value` format. Unknown chunks are ignored."""
     d = {}
@@ -150,8 +152,8 @@ def cmd_pixel(a):
         if t.get('code') == a.code: t['pixel'] = a.path; save(b); print('attached'); return
     sys.exit('no tile with that code')
 
-# ---- Ko-fi payment emails -------------------------------------------------------------------------
-# The exact format of Ko-fi's "you received a tip" email is UNKNOWN until the first real one arrives at
+# ---- payment notification emails (itch.io/PayPal now; Ko-fi before) -------------------------------------------------------------------------
+# The exact format of the itch.io/PayPal "you received a donation" email is UNKNOWN until the first real one arrives at
 # secretwall@mail.grokbot.com. This parser is deliberately loose: it pulls the first USD amount, any claim
 # code (S-XXXX), and the message text, and always prints what it found. When the first real email
 # arrives, save it to admin/samples/ (strip the supporter's email address first), check the dry run, and
@@ -185,7 +187,7 @@ def email_text(raw):
         raw = html.unescape(re.sub(r'<[^>]+>', ' ', raw))
     return re.sub(r'[ \t]+', ' ', raw)
 
-def parse_kofi(raw):
+def parse_payment(raw):
     import hashlib
     txt = email_text(raw)
     out = {'amount': None, 'code': None, 'message': '', 'claim': {}, 'ref': None, 'warnings': []}
@@ -208,12 +210,12 @@ def parse_kofi(raw):
     mid = re.search(r'Message-ID:\s*(\S+)', txt, re.I)
     tx = re.search(r'(?:transaction|reference|txn)[^A-Za-z0-9]{0,5}([A-Za-z0-9-]{8,})', txt, re.I)
     basis = (mid.group(1) if mid else '') or (tx.group(1) if tx else '') or txt
-    out['ref'] = 'kofi:' + hashlib.sha256(basis.encode()).hexdigest()[:16]
+    out['ref'] = 'pay:' + hashlib.sha256(basis.encode()).hexdigest()[:16]
     return out
 
-def cmd_kofi(a):
+def cmd_payment(a):
     raw = pathlib.Path(a.email_file).read_text(errors='replace')
-    r = parse_kofi(raw)
+    r = parse_payment(raw)
     print(json.dumps({k: v for k, v in r.items()}, ensure_ascii=False, indent=2))
     b = load()
     if r['ref'] in b.get('processed', []): sys.exit('already processed (duplicate email)')
@@ -242,7 +244,7 @@ x.add_argument('--claim-file'); x.add_argument('--pos', type=int); x.add_argumen
 for f in ('emoji','color','text','handle','code','pixel','link'): x.add_argument('--'+f)
 x.add_argument('--paid', type=float, required=True); x.add_argument('--ref', help='payment reference, for duplicate protection')
 x = sp.add_parser('tip'); x.add_argument('amount', type=float); x.add_argument('--ref'); x.set_defaults(f=cmd_tip)
-x = sp.add_parser('kofi', help='parse one Ko-fi payment notification email'); x.set_defaults(f=cmd_kofi)
+x = sp.add_parser('payment', aliases=['itch', 'kofi'], help='parse one payment notification email'); x.set_defaults(f=cmd_payment)
 x.add_argument('--email-file', required=True); x.add_argument('--apply', action='store_true'); x.add_argument('--force', action='store_true')
 x = sp.add_parser('pixel'); x.add_argument('code'); x.add_argument('path'); x.set_defaults(f=cmd_pixel)
 x = sp.add_parser('member', help='add a member perk tile (paid 0, not counted)'); x.set_defaults(f=cmd_member)
