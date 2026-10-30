@@ -50,3 +50,13 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:18px;border-t
 .row.share .btn{flex:1 1 auto}
 /* short landscape phones (e.g. 844x390): fit stats + log + all three cards in one screen */
 @media(max-height:500px) and (min-width:601px){header.top{padding-top:6px;padding-bottom:6px}main{padding-top:4px}.stats{gap:6px;margin:6px 0}.stat{padding:4px 8px}.stat .k{font-size:10px}.stat .v{font-size:15px}.log{font-size:13px;padding:6px 10px;min-height:0}.cards{gap:8px;margin:8px 0}.card{padding:8px 10px;gap:3px}.card .e{font-size:20px}.card .d{font-size:12px}#intro h1{font-size:24px;margin:6px 0}}
+/* v1.3: telegraphs and end-screen extras */
+.warn{color:#ffb547}
+.pace{margin:0 0 4px;font-size:14px;color:#d9d5e2}.pace b{color:var(--ink)}.pace b.warn{color:#ffb547}
+.card.hot{border-color:#ffb547;box-shadow:0 0 0 2px rgba(255,181,71,.35)}
+.card .fx b.warn{font-weight:700}
+.score{margin:4px 0 8px;font-size:18px}.score b{color:var(--hl);font-size:22px}
+.tipline{margin:12px 0 0;font-size:14px;color:#cfcbd8}
+@media(max-height:500px) and (min-width:601px){.pace{font-size:12px;margin:0}}
+.card.off{opacity:.45;filter:grayscale(.6)}
+.days,#trail{line-break:anywhere;word-break:break-all;overflow-wrap:anywhere;max-width:100%}
