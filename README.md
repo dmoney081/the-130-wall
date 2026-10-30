@@ -16,7 +16,7 @@ Live: https://dmoney081.github.io/the-130-wall/ (GitHub Pages, repo `dmoney081/t
 - `admin/wall.py`: `status | payment (alias itch, kofi) | add | tip | pixel | member | archive | publish`.
 - `hire/`: Pixel Pal ($5) and Tiny Site ($15). Same pattern: pay on itch, then a prefilled mailto sends the brief
   (subject `Order H-XXXX · Pixel Pal|Tiny Site`).
-- `kit/`: Goal Wall Kit, marked "coming back soon" (no checkout). Memberships are also "coming back soon".
+- `kit/`: Goal Wall Kit, sold on itch.io (https://secretwall.itch.io/goal-wall-kit, $7 minimum, pay more if you like). Memberships are still "coming back soon".
 - `assets/og.png` (social card), `assets/favicon.png`, `assets/og.html` (card source).
 - `LAUNCH.md`: launch copy drafts. Nothing has been posted.
 
