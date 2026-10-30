@@ -46,14 +46,8 @@
   $('tiplink').href = kofi;
   if (next && $('cta-claim')) $('cta-claim').textContent = `Claim a tile for $${next}`; else if ($('cta-claim')) $('cta-claim').textContent = 'See the wall';
 
-  // countdown
-  const dl = new Date(cfg.deadline_iso);
-  function tick(){
-    let s = Math.max(0, (dl - new Date())/1000|0);
-    const d=s/86400|0; s%=86400; const h=s/3600|0; s%=3600; const m=s/60|0; s%=60;
-    $('clock').textContent = raised >= cfg.goal_usd ? 'GOAL HIT 👑' : `${d}d ${String(h).padStart(2,'0')}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s left`;
-  }
-  tick(); setInterval(tick, 1000);
+  // header status (tiles left; no countdown)
+  $('clock').textContent = raised >= cfg.goal_usd ? 'WALL FILLED 👑' : (archived ? 'Archived wall' : next ? `${N - tiles.length} tiles open · next $${next}` : 'Wall full');
 
   // wall
   const wall = $('wall');

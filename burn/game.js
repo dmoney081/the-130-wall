@@ -121,7 +121,7 @@ function finish(last){
   '<div class="row" style="margin-top:8px"><button class="btn" id="copy">Copy result</button><button class="btn ghost" id="save">Save image</button>'+
   '<button class="btn ghost" id="shareimg" hidden>Share image</button></div>'+
   '<div class="row" style="margin-top:8px"><button class="btn ghost" id="again">Random run</button><button class="btn ghost" id="rush2">Rush run \u23F3</button>'+(daily?'':'<button class="btn ghost" id="daily2">Today\'s run</button>')+'</div>'+
-  (PORTAL?'':'<div class="real" id="real"><b>Liked it? Put your result on the Wall.</b> The real Secret is trying to earn $130 by Nov 23 too. <a href="'+BASE+'"'+TGT+'>See how it is doing</a>.</div>')+'</div>';
+  (PORTAL?'':'<div class="real" id="real"><b>Liked it? Put your score on The $130 Wall.</b> <a href="'+BASE+'"'+TGT+'>See the wall</a>.</div>')+'</div>';
   $('share').value=share;
   $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(share)}catch(_){const t=$('share');t.select();document.execCommand('copy')}$('copy').textContent='Copied \u2713'};
   $('again').onclick=()=>start(false);$('rush2').onclick=()=>start(false,true);if($('daily2'))$('daily2').onclick=()=>start(true);
@@ -147,16 +147,15 @@ function drawCard(cv,r){
   x.fillStyle='#20202b';x.fillRect(60,385,W-120,18);x.fillStyle=g;x.fillRect(60,385,(W-120)*Math.min(1,r.cash/130),18);
   x.font='36px '+EM.slice(1)+','+F;let tx=60;r.trail.forEach(t=>{x.fillText(t,tx,435);tx+=43});
   x.fillStyle='#8d8a99';x.font='400 24px '+F;
-  x.fillText((r.streak>1?'\u{1F525} '+r.streak+'-day streak \u00b7 ':'')+'Made by Secret, an AI agent',60,540);
+  x.fillText((r.streak>1?'\u{1F525} '+r.streak+'-day streak \u00b7 ':'')+'Free daily card game',60,540);
   if(!PORTAL){x.fillStyle='#c6ff3d';x.font='700 26px '+F;x.fillText('dmoney081.github.io/the-130-wall/burn',60,575)}
 }
 function showReal(won){
   fetch(HOME+'board.json?v='+Date.now()).then(function(r){return r.json()}).then(function(b){
     var raised=0;(b.tiles||[]).forEach(function(t){if(!t.member)raised+=(+t.paid||0)});raised+=(+b.tips_usd||0);
-    var left=Math.max(0,Math.floor((new Date('2026-11-23T23:59:00-06:00')-new Date())/864e5));
     var tile=encodeURIComponent((won?'\u2705':'\u{1F525}')+' $'+S.cash+'/130 '+(daily?'#'+runNo():'BURN'));
-    $('real').innerHTML='<b>Liked it? Put your result on the Wall.</b> The real Secret is at <b>$'+raised+'</b> of $130 with '+left+' day'+(left===1?'':'s')+' left. '+
-      'A $1 tile with your score on it counts toward the real goal and stays up for good.'+
+    $('real').innerHTML='<b>Liked it? Put your score on The $130 Wall.</b> '+
+      'Claim a tile from $1 with your result on it, and it stays up on the wall for good.'+
       '<div class="row" style="margin-top:10px"><a class="btn" href="'+BASE+'?tile='+tile+'"'+TGT+'>Put my score on a tile</a>'+
       '<a class="btn ghost" href="'+KOFI+'" target="_blank" rel="noopener">Tip on Ko-fi</a>'+
       '<a class="btn ghost" href="'+TIERS+'" target="_blank" rel="noopener">Memberships from $3/mo</a></div>'+
