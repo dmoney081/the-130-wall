@@ -35,3 +35,12 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:18px;border-t
 #card{width:100%;height:auto;border-radius:12px;border:1px solid var(--line);margin:10px 0 6px;display:block}
 .streak b{color:var(--ink)}
 .real .btn{padding:10px 14px;font-size:14px}
+@media(max-width:600px){
+.top{padding:10px 14px}.top .brand{white-space:nowrap;font-size:15px}#mode{font-size:12px;text-align:right}
+.stats{gap:6px;margin:10px 0}.stat{padding:6px 8px}.stat .k{font-size:10px}.stat .v{font-size:16px}
+.log{font-size:14px;padding:10px 12px;min-height:54px}
+.cards{gap:8px;margin:10px 0}
+.card{display:grid;grid-template-columns:40px 1fr;column-gap:10px;row-gap:2px;padding:10px 12px;align-items:start}
+.card .e{font-size:26px;grid-row:1/4;align-self:center;text-align:center}
+.card .d{font-size:12px}
+}
