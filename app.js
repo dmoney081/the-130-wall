@@ -44,6 +44,7 @@
   // Ko-fi has no documented amount parameter, so by default we link the plain page and state the amount.
   const kofiFor = amt => cfg.kofi_amount_deeplink ? `${kofi}/${amt}` : kofi;
   $('tiplink').href = kofi;
+  if (next && $('cta-claim')) $('cta-claim').textContent = `Claim a tile for $${next}`; else if ($('cta-claim')) $('cta-claim').textContent = 'See the wall';
 
   // countdown
   const dl = new Date(cfg.deadline_iso);
@@ -85,10 +86,40 @@
 
   // supporters
   fetch('credits.json'+bust).then(r=>r.ok?r.json():[]).then(c => {
+    proof(c.length);
     const el = $('supporters'); if (!el) return;
     el.innerHTML = c.length ? c.map(x => `<li>${esc(x.name)} <span class="muted">· ${esc(x.tier||'')}${x.since?' since '+esc(x.since):''}</span></li>`).join('')
                             : '<li class="muted">No members yet. You could be the first.</li>';
-  }).catch(()=>{});
+  }).catch(()=>proof(0));
+
+  // social proof: only real numbers from board.json / credits.json; stays hidden while everything is zero
+  function proof(members){
+    const el = $('proof'); if (!el || archived) return;
+    const bits = [];
+    if (sold) bits.push(`<b>${sold}</b> tile${sold>1?'s':''} claimed`);
+    const backers = new Set(paidTiles.map(t => (t.handle||'').toLowerCase()).filter(Boolean)).size;
+    if (backers > 1) bits.push(`<b>${backers}</b> named backers`);
+    if (members) bits.push(`<b>${members}</b> member${members>1?'s':''}`);
+    const last = [...paidTiles].filter(t=>t.ts).sort((a,b)=> new Date(b.ts) - new Date(a.ts))[0];
+    if (last){
+      const mins = Math.max(1, Math.round((Date.now() - new Date(last.ts))/60000));
+      const ago = mins < 60 ? mins+' min' : mins < 2880 ? Math.round(mins/60)+' h' : Math.round(mins/1440)+' days';
+      bits.push(`Latest: ${esc(last.emoji||'')} ${esc(last.text||'tile '+(last.pos+1))}${last.handle?' by '+esc(last.handle):''} · ${ago} ago`);
+    }
+    if (!bits.length) return;
+    el.innerHTML = bits.map(b => `<span>${b}</span>`).join(''); el.hidden = false;
+  }
+
+  // ?tile=... from Burn Rate: prefill the claim form with the player's score (they still pick the tile and decide to tip)
+  const pre = new URLSearchParams(location.search).get('tile');
+  let preEmoji = '', preText = '';
+  if (pre && next){
+    const m = pre.match(/^(\S+)\s+(.*)$/);
+    if (m && !/[A-Za-z0-9$]/.test(m[1])){ preEmoji = m[1].slice(0,8); preText = m[2]; } else preText = pre;
+    preText = preText.slice(0,24);
+    const pf = $('prefill');
+    if (pf){ pf.textContent = `Your Burn Rate score “${(preEmoji+' '+preText).trim()}” is ready. Tap any empty tile below and it's filled in. You can change it before you tip.`; pf.hidden = false; requestAnimationFrame(() => pf.scrollIntoView({block:'start'})); }
+  }
 
   // claim dialog (Ko-fi flow)
   const dlg = $('claim'); let cur = null;
@@ -103,6 +134,7 @@
     $('pixrow').style.display = next >= 3 ? '' : 'none';
     $('c-pay').href = kofiFor(next);
     $('c-copy').textContent = '1 · Copy claim message';
+    if (preText){ $('f-text').value = preText; if (preEmoji) $('f-emoji').value = preEmoji; preText = ''; }
     refresh(); dlg.showModal();
   }
   // One line, "key value" pairs split by " | ". admin/wall.py parse_claim() reads this format.

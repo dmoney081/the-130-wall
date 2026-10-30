@@ -30,3 +30,8 @@ textarea{width:100%;background:#0b0b10;color:var(--ink);border:1px solid var(--l
 details{margin-top:18px;color:#cfcbd8}summary{cursor:pointer;font-weight:700;color:var(--ink)}
 footer{text-align:center;color:var(--muted);font-size:12px;padding:18px;border-top:1px solid var(--line)}
 .shake{animation:sh .35s}@keyframes sh{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+
+.timer{height:8px;background:#20202b;border-radius:9px;overflow:hidden;margin:0 0 10px}.timer i{display:block;height:100%;width:100%;background:var(--blue)}.timer i.low{background:var(--bad)}
+#card{width:100%;height:auto;border-radius:12px;border:1px solid var(--line);margin:10px 0 6px;display:block}
+.streak b{color:var(--ink)}
+.real .btn{padding:10px 14px;font-size:14px}

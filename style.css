@@ -71,3 +71,17 @@ dialog::backdrop{background:rgba(0,0,0,.7)}
 
 .tile.member{outline:2px dashed rgba(255,255,255,.55);outline-offset:-3px;position:relative}
 .tile .mb{position:absolute;right:2px;bottom:1px;font-size:9px;font-weight:700;background:#000a;color:#fff;border-radius:3px;padding:0 3px}
+
+.pitch{list-style:none;padding:0;margin:18px 0 14px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:900px}
+.pitch li{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:3px}
+.pitch b{color:var(--hl);font-size:12px;text-transform:uppercase;letter-spacing:.12em}.pitch span{color:#dcd8e4;font-size:15px;line-height:1.4}
+@media(max-width:720px){.pitch{grid-template-columns:1fr}}
+.cta{display:flex;gap:10px;flex-wrap:wrap}.cta .btn{display:inline-block;padding:12px 18px}
+.proof{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.proof span{background:#101018;border:1px solid var(--line);border-radius:99px;padding:4px 12px;font-size:13px;color:#dcd8e4}
+.proof b{color:var(--ink)}
+.prefill{background:#101018;border:1px dashed var(--hl);border-radius:12px;padding:10px 14px;font-size:14px}
+.more4{grid-template-columns:repeat(4,1fr)}@media(max-width:900px){.more4{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.more4{grid-template-columns:1fr}}
+.wallwrap{scroll-margin-top:70px}
+@media(max-width:720px){.pitch{gap:6px;margin:12px 0}.pitch li{padding:8px 12px}.pitch span{font-size:14px}.cta .btn{padding:10px 14px;font-size:14px}.sub{font-size:16px}}
+.prefill{scroll-margin-top:70px}

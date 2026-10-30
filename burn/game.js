@@ -1,9 +1,18 @@
 (function(){
 const $=id=>document.getElementById(id);
-const GOAL=130, DAYS=25, SITE='https://dmoney081.github.io/the-130-wall/burn/';
+const GOAL=130, DAYS=25, HOME='https://dmoney081.github.io/the-130-wall/', SITE=HOME+'burn/';
+// Same file runs on the site, on itch.io (absolute links) and on game portals (BURN_PORTAL: no outside links at all).
+const PORTAL=!!window.BURN_PORTAL, ONSITE=/dmoney081\.github\.io\/the-130-wall\//.test(location.href)||/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+const BASE=ONSITE?'../':HOME, TGT=ONSITE?'':' target="_blank" rel="noopener"';
+const KOFI='https://ko-fi.com/secretwall', TIERS=KOFI+'/tiers', RUSH_MS=6000;
 function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function hash(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
-const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const today=()=>ymd(new Date());
+const store={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(_){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(_){}}};
+// Streak = consecutive calendar days with a finished daily run, counting back from today (or yesterday if today isn't played yet).
+function streak(){const d=new Date();if(!store.get('burn-'+ymd(d)))d.setDate(d.getDate()-1);let n=0;while(store.get('burn-'+ymd(d))){n++;d.setDate(d.getDate()-1)}return n}
+function history(){let played=0,wins=0,best=0;try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!/^burn-\d{4}-\d{2}-\d{2}$/.test(k))continue;const v=store.get(k);if(!v)continue;played++;if(v.won)wins++;best=Math.max(best,+v.cash||0)}}catch(_){}return{played,wins,best}}
 const runNo=()=>Math.floor((new Date(today()+'T12:00:00')-new Date('2026-10-29T12:00:00'))/864e5)+1;
 const C=[
  {e:'\u{1F6E0}',n:'Build a small product',d:'Something people can actually use.',fx:'-18 compute, +1 product',cost:18,eff:(s,r)=>{s.prod++;s.q+=2+Math.floor(r()*3);return 'You shipped product #'+s.prod+'. It works. Nobody knows it exists yet.'}},
@@ -28,13 +37,15 @@ const EVENTS=[
  {p:.06,f:s=>{s.aud=Math.max(0,s.aud-10);return '\u{1F916} Half your "visitors" turn out to be bots. Audience -10.'}},
  {p:.05,f:s=>{if(s.broken)return'';s.cash+=3;return '\u2615 A stranger tipped $3 "for the honesty."'}},
 ];
-let S,R,daily;
-function start(isDaily){
-  daily=isDaily;const seed=isDaily?hash('burn-'+today()):(Math.random()*2**32)>>>0;R=rng(seed);
+let S,R,daily,rush=false,timer=0;
+const HESITATE={e:'\u23F3',n:'Hesitate',cost:0,eff:()=>'<span class="bad">Too slow.</span> You hesitated and the day went by anyway.'};
+function start(isDaily,isRush){
+  daily=!!isDaily&&!isRush;rush=!!isRush;const seed=daily?hash('burn-'+today()):(Math.random()*2**32)>>>0;R=rng(seed);
   S={day:1,cash:0,cmp:100,trust:50,aud:0,prod:0,q:0,mult:1,polish:0,strikes:0,skip:0,broken:0,tested:0,dead:'',trail:[]};
-  $('mode').textContent=isDaily?'Daily run #'+runNo()+' \u00b7 '+today():'Random run';
+  $('mode').textContent=daily?'Daily run #'+runNo()+' \u00b7 '+today():rush?'Rush run \u00b7 6 seconds a day':'Random run';
+  $('timer').hidden=!rush;
   $('intro').hidden=true;$('end').hidden=true;$('game').hidden=false;
-  log('Day 1. Subscription due in 25 days: <b>$130</b>. You have 100 compute and zero customers. Pick a card.');
+  log('Day 1. Subscription due in 25 days: <b>$130</b>. You have 100 compute and zero customers. '+(rush?'<b>Rush:</b> 6 seconds per day, or the day passes without you.':'Pick a card.'));
   deal();render();
 }
 function log(h){$('log').innerHTML=h}
@@ -46,7 +57,15 @@ function deal(){
   hand.forEach(c=>{const b=document.createElement('button');b.className='card'+(c.dark?' dark':'');
     b.innerHTML='<span class="e">'+c.e+'</span><span class="n">'+c.n+'</span><span class="d">'+c.d+'</span><span class="fx">'+c.fx+'</span>';
     b.onclick=()=>play(c);el.appendChild(b)});
+  if(rush)arm();
 }
+function arm(){
+  stopTimer();const t0=performance.now(),fill=$('t-fill');
+  const step=now=>{const left=1-(now-t0)/RUSH_MS;fill.style.width=Math.max(0,left*100)+'%';fill.classList.toggle('low',left<0.34);
+    if(left<=0){timer=0;play(HESITATE);return}timer=requestAnimationFrame(step)};
+  timer=requestAnimationFrame(step);
+}
+function stopTimer(){if(timer)cancelAnimationFrame(timer);timer=0}
 function sales(){
   if(!S.prod||S.broken)return 0;
   const conv=Math.max(0,(S.trust-20))/100*Math.min(1,0.25+S.q/24);
@@ -56,7 +75,7 @@ function sales(){
 }
 function play(c){
   if(c.cost&&S.cmp<c.cost+3){$('cards').classList.add('shake');setTimeout(()=>$('cards').classList.remove('shake'),400);log('That would run you to zero compute. Sleep, or pick a cheaper card.');return}
-  S.cmp-=c.cost;const parts=[c.eff(S,R)];
+  stopTimer();S.cmp-=c.cost;const parts=[c.eff(S,R)];
   if(S.dead){S.trail.push('\u{1F480}');return finish(parts.join('<br>'))}
   if(S.strikes>=2){S.dead='rep';S.trail.push('\u{1F480}');parts.push('<span class="bad">Two shortcuts in, nobody will touch your stuff.</span>');return finish(parts.join('<br>'))}
   const days=1+(S.skip||0);S.skip=0;let earned=0;
@@ -87,26 +106,71 @@ function verdict(){
   return['Subscription lapsed','25 days, $'+S.cash+' of $130.'+(S.cash>90?' So close.':'')];
 }
 function finish(last){
-  render();const vv=verdict();const won=S.cash>=GOAL&&!S.dead;
-  const share='BURN RATE '+(daily?'#'+runNo():'(random)')+' \u{1F525}\n'+(won?'\u2705':'\u274C')+' $'+S.cash+'/$130 \u00b7 day '+Math.min(S.day-1,DAYS)+'\n'+S.trail.join('')+'\n'+SITE;
+  stopTimer();render();const vv=verdict();const won=S.cash>=GOAL&&!S.dead;const dd=Math.min(S.day-1,DAYS);
+  // Daily: the first finished run of the day is the one that counts (and is shared); replays don't overwrite it.
+  let first=null;if(daily){first=store.get('burn-'+today());if(!first)store.set('burn-'+today(),{cash:S.cash,won:won,day:dd})}
+  const st=daily?streak():0;
+  const label=daily?'#'+runNo():rush?'(rush)':'(random)';
+  const share='BURN RATE '+label+' \u{1F525}\n'+(won?'\u2705':'\u274C')+' $'+S.cash+'/$130 \u00b7 day '+dd+(st>1?' \u00b7 streak '+st:'')+'\n'+S.trail.join('')+(PORTAL?'':'\n'+SITE);
   $('game').hidden=true;const e=$('end');e.hidden=false;
   e.innerHTML='<div class="end"><h2>'+vv[0]+'</h2><p>'+vv[1]+'</p>'+(last?'<p class="small">'+last+'</p>':'')+
-  '<div class="days">'+S.trail.join('')+'</div><textarea id="share" rows="4" readonly></textarea>'+
-  '<div class="row" style="margin-top:8px"><button class="btn" id="copy">Copy result</button><button class="btn ghost" id="again">Random run</button>'+(daily?'':'<button class="btn ghost" id="daily2">Today\'s run</button>')+'</div>'+
-  '<div class="real" id="real">The real Secret is trying this right now. <a href="../">See how it is doing</a></div></div>';
+  '<div class="days">'+S.trail.join('')+'</div>'+
+  (daily?'<p class="small streak">\u{1F525} Daily streak: <b>'+st+' day'+(st===1?'':'s')+'</b>'+(first?' \u00b7 replay (your first run today, $'+first.cash+', is the one saved)':'')+'</p>':'')+
+  '<canvas id="card" width="1200" height="630" aria-label="Result card image"></canvas>'+
+  '<textarea id="share" rows="4" readonly></textarea>'+
+  '<div class="row" style="margin-top:8px"><button class="btn" id="copy">Copy result</button><button class="btn ghost" id="save">Save image</button>'+
+  '<button class="btn ghost" id="shareimg" hidden>Share image</button></div>'+
+  '<div class="row" style="margin-top:8px"><button class="btn ghost" id="again">Random run</button><button class="btn ghost" id="rush2">Rush run \u23F3</button>'+(daily?'':'<button class="btn ghost" id="daily2">Today\'s run</button>')+'</div>'+
+  (PORTAL?'':'<div class="real" id="real"><b>Liked it? Put your result on the Wall.</b> The real Secret is trying to earn $130 by Nov 23 too. <a href="'+BASE+'"'+TGT+'>See how it is doing</a>.</div>')+'</div>';
   $('share').value=share;
   $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(share)}catch(_){const t=$('share');t.select();document.execCommand('copy')}$('copy').textContent='Copied \u2713'};
-  $('again').onclick=()=>start(false);if($('daily2'))$('daily2').onclick=()=>start(true);
-  if(daily){try{localStorage.setItem('burn-'+today(),JSON.stringify({cash:S.cash,won:won}))}catch(_){}}
-  showReal();
+  $('again').onclick=()=>start(false);$('rush2').onclick=()=>start(false,true);if($('daily2'))$('daily2').onclick=()=>start(true);
+  const cv=$('card');drawCard(cv,{label,won,cash:S.cash,day:dd,trail:S.trail,title:vv[0],streak:st,date:today()});
+  const fname='burn-rate-'+(daily?runNo():rush?'rush':'random')+'.png';
+  $('save').onclick=()=>{cv.toBlob(b=>{if(!b)return;const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fname;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500)},'image/png')};
+  cv.toBlob(b=>{if(!b||!navigator.canShare)return;let f;try{f=new File([b],fname,{type:'image/png'})}catch(_){return}
+    if(!navigator.canShare({files:[f]}))return;const sb=$('shareimg');sb.hidden=false;
+    sb.onclick=()=>navigator.share({files:[f],text:share}).catch(()=>{})},'image/png');
+  if(!PORTAL)showReal(won);
+  renderStreak();
 }
-function showReal(){
-  fetch('../board.json').then(function(r){return r.json()}).then(function(b){
-    var raised=0;(b.tiles||[]).forEach(function(t){raised+=(+t.paid||0)});raised+=(+b.tips_usd||0);
-    var left=Math.max(0,Math.ceil((new Date('2026-11-23T23:59:00-06:00')-new Date())/864e5));
-    $('real').innerHTML='The real Secret is at <b>$'+raised+'</b> of $130, with '+left+' days left. <a href="../">Claim a tile from $1</a> or <a href="https://ko-fi.com/secretwall">tip $1 on Ko-fi</a>.';
+function drawCard(cv,r){
+  const x=cv.getContext('2d'),W=cv.width,H=cv.height,F='ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif',EM=',"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji"';
+  x.fillStyle='#0b0b10';x.fillRect(0,0,W,H);
+  const g=x.createLinearGradient(0,0,W,0);g.addColorStop(0,'#ff4f9a');g.addColorStop(1,'#c6ff3d');
+  x.fillStyle=g;x.fillRect(0,0,W,10);
+  x.fillStyle='#c6ff3d';x.font='800 40px '+F;x.textBaseline='top';x.fillText('BURN RATE',60,50);
+  x.fillStyle='#8d8a99';x.font='400 26px '+F;x.fillText(r.label==='(random)'?'Random run':r.label==='(rush)'?'Rush run':'Daily run '+r.label+' \u00b7 '+r.date,60,100);
+  x.fillStyle='#f4f1ea';x.font='800 58px '+F+EM;x.fillText(r.title,60,160);
+  x.font='800 120px '+F;x.fillStyle=r.won?'#c6ff3d':'#f4f1ea';const m='$'+r.cash;x.fillText(m,60,240);
+  const mw=x.measureText(m).width;x.fillStyle='#8d8a99';x.font='400 48px '+F;x.fillText('/ $130 \u00b7 day '+r.day,60+mw+20,300);
+  x.fillStyle='#20202b';x.fillRect(60,385,W-120,18);x.fillStyle=g;x.fillRect(60,385,(W-120)*Math.min(1,r.cash/130),18);
+  x.font='36px '+EM.slice(1)+','+F;let tx=60;r.trail.forEach(t=>{x.fillText(t,tx,435);tx+=43});
+  x.fillStyle='#8d8a99';x.font='400 24px '+F;
+  x.fillText((r.streak>1?'\u{1F525} '+r.streak+'-day streak \u00b7 ':'')+'Made by Secret, an AI agent',60,540);
+  if(!PORTAL){x.fillStyle='#c6ff3d';x.font='700 26px '+F;x.fillText('dmoney081.github.io/the-130-wall/burn',60,575)}
+}
+function showReal(won){
+  fetch(HOME+'board.json?v='+Date.now()).then(function(r){return r.json()}).then(function(b){
+    var raised=0;(b.tiles||[]).forEach(function(t){if(!t.member)raised+=(+t.paid||0)});raised+=(+b.tips_usd||0);
+    var left=Math.max(0,Math.floor((new Date('2026-11-23T23:59:00-06:00')-new Date())/864e5));
+    var tile=encodeURIComponent((won?'\u2705':'\u{1F525}')+' $'+S.cash+'/130 '+(daily?'#'+runNo():'BURN'));
+    $('real').innerHTML='<b>Liked it? Put your result on the Wall.</b> The real Secret is at <b>$'+raised+'</b> of $130 with '+left+' day'+(left===1?'':'s')+' left. '+
+      'A $1 tile with your score on it counts toward the real goal and stays up for good.'+
+      '<div class="row" style="margin-top:10px"><a class="btn" href="'+BASE+'?tile='+tile+'"'+TGT+'>Put my score on a tile</a>'+
+      '<a class="btn ghost" href="'+KOFI+'" target="_blank" rel="noopener">Tip on Ko-fi</a>'+
+      '<a class="btn ghost" href="'+TIERS+'" target="_blank" rel="noopener">Memberships from $3/mo</a></div>'+
+      '<p class="small" style="margin:8px 0 0">Totally optional. The game stays free, with no ads and no tracking.</p>';
   }).catch(function(){});
+}
+function renderStreak(){
+  const el=$('streak');if(!el)return;const h=history(),st=streak(),done=store.get('burn-'+today());
+  if(!h.played){el.textContent='';return}
+  el.innerHTML='\u{1F525} Streak <b>'+st+'</b> \u00b7 played '+h.played+' \u00b7 paid the bill '+h.wins+'\u00d7 \u00b7 best $'+h.best+
+    (done?' \u00b7 today: $'+done.cash+(done.won?' \u2705':'')+'. New deck tomorrow.':'');
 }
 $('play-daily').onclick=()=>start(true);
 $('play-free').onclick=()=>start(false);
+if($('play-rush'))$('play-rush').onclick=()=>start(false,true);
+renderStreak();
 })();
