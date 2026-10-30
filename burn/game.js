@@ -38,6 +38,16 @@ const EVENTS=[
  {p:.05,f:s=>{if(s.broken)return'';s.cash+=3;return '\u2615 A stranger tipped $3 "for the honesty."'}},
 ];
 let S,R,daily,rush=false,timer=0;
+// Challenge links: ?beat=<score>&deck=<daily deck #>. Only small whole numbers are accepted.
+const CH=(()=>{try{const q=new URLSearchParams(location.search),b=q.get('beat'),k=q.get('deck');
+  if(!/^\d{1,3}$/.test(b||'')||!/^[1-9]\d{0,3}$/.test(k||''))return null;return{beat:+b,deck:+k}}catch(_){return null}})();
+const challengeUrl=(cash)=>SITE+'?beat='+cash+'&deck='+runNo();
+function showChallenge(){
+  const el=$('challenge');if(!el||!CH)return;
+  el.innerHTML=CH.deck===runNo()?'\u{1F3AF} <b>Beat $'+CH.beat+' on deck #'+CH.deck+'.</b> A friend played today\'s deck and scored $'+CH.beat+'. Tap "Play today\'s run" to try the same cards.'
+    :'\u{1F3AF} <b>A friend scored $'+CH.beat+' on deck #'+CH.deck+'.</b> Today\'s deck is #'+runNo()+', a different set of cards, but can you beat $'+CH.beat+'?';
+  el.hidden=false;
+}
 const HESITATE={e:'\u23F3',n:'Hesitate',cost:0,eff:()=>'<span class="bad">Too slow.</span> You hesitated and the day went by anyway.'};
 function start(isDaily,isRush){
   daily=!!isDaily&&!isRush;rush=!!isRush;const seed=daily?hash('burn-'+today()):(Math.random()*2**32)>>>0;R=rng(seed);
@@ -111,19 +121,27 @@ function finish(last){
   let first=null;if(daily){first=store.get('burn-'+today());if(!first)store.set('burn-'+today(),{cash:S.cash,won:won,day:dd})}
   const st=daily?streak():0;
   const label=daily?'#'+runNo():rush?'(rush)':'(random)';
-  const share='BURN RATE '+label+' \u{1F525}\n'+(won?'\u2705':'\u274C')+' $'+S.cash+'/$130 \u00b7 day '+dd+(st>1?' \u00b7 streak '+st:'')+'\n'+S.trail.join('')+(PORTAL?'':'\n'+SITE);
+  const link=daily?challengeUrl(S.cash):SITE;
+  const share='BURN RATE '+label+' \u{1F525}\n'+(won?'\u2705':'\u274C')+' $'+S.cash+'/$130 \u00b7 day '+dd+(st>1?' \u00b7 streak '+st:'')+'\n'+S.trail.join('')+(PORTAL?'':'\n'+link);
+  const vs=(daily&&CH&&CH.deck===runNo())?'<p class="vs">'+(S.cash>CH.beat?'\u{1F3C6} You beat your friend: $'+S.cash+' vs $'+CH.beat+'.':S.cash===CH.beat?'\u{1F91D} A tie: $'+S.cash+' each.':'Your friend wins this one: $'+CH.beat+' vs your $'+S.cash+'.')+'</p>':'';
   $('game').hidden=true;const e=$('end');e.hidden=false;
   e.innerHTML='<div class="end"><h2>'+vv[0]+'</h2><p>'+vv[1]+'</p>'+(last?'<p class="small">'+last+'</p>':'')+
-  '<div class="days">'+S.trail.join('')+'</div>'+
+  vs+'<div class="days">'+S.trail.join('')+'</div>'+
   (daily?'<p class="small streak">\u{1F525} Daily streak: <b>'+st+' day'+(st===1?'':'s')+'</b>'+(first?' \u00b7 replay (your first run today, $'+first.cash+', is the one saved)':'')+'</p>':'')+
   '<canvas id="card" width="1200" height="630" aria-label="Result card image"></canvas>'+
   '<textarea id="share" rows="4" readonly></textarea>'+
   '<div class="row" style="margin-top:8px"><button class="btn" id="copy">Copy result</button><button class="btn ghost" id="save">Save image</button>'+
   '<button class="btn ghost" id="shareimg" hidden>Share image</button></div>'+
+  (PORTAL?'':'<div class="row share" style="margin-top:8px"><a class="btn ghost" id="sh-bsky" href="https://bsky.app/intent/compose?text='+encodeURIComponent(share)+'" target="_blank" rel="noopener">Share on Bluesky</a>'+
+    '<a class="btn ghost" id="sh-x" href="https://x.com/intent/post?text='+encodeURIComponent(share)+'" target="_blank" rel="noopener">Post on X</a>'+
+    (daily?'<button class="btn ghost" id="sh-ch">Challenge a friend</button>':'')+'</div>'+
+    (daily?'<p class="small" id="ch-note" hidden>Link copied. Your friend gets today\'s deck (#'+runNo()+') and sees \u201cBeat $'+S.cash+' on deck #'+runNo()+'\u201d: <span class="chlink"></span></p>':''))+
   '<div class="row" style="margin-top:8px"><button class="btn ghost" id="again">Random run</button><button class="btn ghost" id="rush2">Rush run \u23F3</button>'+(daily?'':'<button class="btn ghost" id="daily2">Today\'s run</button>')+'</div>'+
   (PORTAL?'':'<div class="real" id="real"><b>Liked it? Put your score on The $130 Wall.</b> <a href="'+BASE+'"'+TGT+'>See the wall</a>.</div>')+'</div>';
   $('share').value=share;
   $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(share)}catch(_){const t=$('share');t.select();document.execCommand('copy')}$('copy').textContent='Copied \u2713'};
+  if($('sh-ch'))$('sh-ch').onclick=async()=>{const u=challengeUrl(S.cash);const n=$('ch-note');n.querySelector('.chlink').textContent=u;n.hidden=false;
+    try{await navigator.clipboard.writeText(u);$('sh-ch').textContent='Link copied \u2713'}catch(_){$('sh-ch').textContent='Copy the link below'}};
   $('again').onclick=()=>start(false);$('rush2').onclick=()=>start(false,true);if($('daily2'))$('daily2').onclick=()=>start(true);
   const cv=$('card');drawCard(cv,{label,won,cash:S.cash,day:dd,trail:S.trail,title:vv[0],streak:st,date:today()});
   const fname='burn-rate-'+(daily?runNo():rush?'rush':'random')+'.png';
@@ -171,4 +189,5 @@ $('play-daily').onclick=()=>start(true);
 $('play-free').onclick=()=>start(false);
 if($('play-rush'))$('play-rush').onclick=()=>start(false,true);
 renderStreak();
+showChallenge();
 })();

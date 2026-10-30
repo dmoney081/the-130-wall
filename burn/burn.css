@@ -44,3 +44,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:18px;border-t
 .card .e{font-size:26px;grid-row:1/4;align-self:center;text-align:center}
 .card .d{font-size:12px}
 }
+.challenge{margin:12px 0;padding:12px 14px;border:1px solid var(--hl);border-radius:12px;background:rgba(198,255,61,.06)}
+.vs{font-weight:700;margin:8px 0}
+.chlink{word-break:break-all;color:var(--ink)}
+.row.share .btn{flex:1 1 auto}

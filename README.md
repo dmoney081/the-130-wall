@@ -30,9 +30,9 @@ Live: https://dmoney081.github.io/the-130-wall/ (GitHub Pages, repo `dmoney081/t
 4. The tile goes up once the payment is matched, promised "usually within a day".
 
 ## Ops loop
-1. Search secretwall@mail.grokbot.com for `Tile claim S-` and `Order H-` emails, and for itch.io/PayPal payment
-   notifications (format not yet seen; whichever mailbox Dustin's itch/PayPal account notifies may be his, so ask
-   him to forward or confirm payments if none arrive here).
+1. Search secretwall@mail.grokbot.com for `Tile claim S-` and `Order H-` emails and for itch.io payment emails
+   (the itch account email is secretwall@mail.grokbot.com, so itch notices land there). PayPal receipts go to
+   Dustin's Gmail, which his routine already reads. No forwarding needed: match on amount + `Paid as` name/email.
 2. Match each claim to a payment by amount, payer name/email and time. Do not add a tile without a matched payment.
 3. Save the claim email body to `admin/inbox/<id>.txt` (gitignored) and run
    `wall.py add --claim-file admin/inbox/<id>.txt --paid 3 --ref pay:<unique payment id>`.
