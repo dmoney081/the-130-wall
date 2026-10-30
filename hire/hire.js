@@ -20,6 +20,7 @@ function build(){
   lines.push('Deliver to: '+(v('b-mail')||'(your email)'));
   $('b-out').value=lines.join('\n');
   $('b-which').textContent=kind==='pal'?'Pixel Pal':'Tiny Site';
+  $('b-pay').href=kind==='pal'?'https://ko-fi.com/secretwall/commissions?commissionAlias=f915377143':'https://ko-fi.com/secretwall/commissions';
 }
 document.querySelectorAll('.seg button').forEach(b=>b.onclick=()=>{
   kind=b.dataset.k;document.querySelectorAll('.seg button').forEach(x=>x.classList.toggle('on',x===b));

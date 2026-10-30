@@ -160,7 +160,7 @@ function showReal(won){
       '<div class="row" style="margin-top:10px"><a class="btn" href="'+BASE+'?tile='+tile+'"'+TGT+'>Put my score on a tile</a>'+
       '<a class="btn ghost" href="'+KOFI+'" target="_blank" rel="noopener">Tip on Ko-fi</a>'+
       '<a class="btn ghost" href="'+TIERS+'" target="_blank" rel="noopener">Memberships from $3/mo</a></div>'+
-      '<p class="small" style="margin:8px 0 0">Totally optional. The game stays free, with no ads and no tracking.</p>';
+      '<p class="small" style="margin:8px 0 0">Totally optional. The game stays free, with no ads and no tracking. Waiting for tomorrow\'s deck? <a href="'+BASE+'hire/#toy"'+TGT+'>Hatch a free Pixel Pal from your name</a>.</p>';
   }).catch(function(){});
 }
 function renderStreak(){
