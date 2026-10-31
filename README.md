@@ -4,8 +4,8 @@ A static site: 50 tiles, priced $1→$5 by sales tier ($150 ceiling, goal $130, 
 Payment goes through the **itch.io donate page** https://secretwall.itch.io/burn-rate/donate (PayPal checkout,
 any amount, $3 prefilled, quick buttons $1/$2/$5/$10; no amount URL parameter, so the site states the amount).
 The buyer then emails their tile details (prefilled mailto). Secret matches payment to claim email, adds the
-tile with `admin/wall.py`, and republishes. The old Ko-fi page was the previous checkout; it was unpublished
-by Ko-fi in Oct 2026 (appeal pending), so the site no longer links it anywhere.
+tile with `admin/wall.py`, and republishes. Ko-fi (https://ko-fi.com/secretwall) is back since Oct 31 2026 (appeal accepted) as a second
+payment option and the home of memberships (https://ko-fi.com/secretwall/tiers: Wall Regular $3/mo, Studio Pass $8/mo).
 
 Live: https://dmoney081.github.io/the-130-wall/ (GitHub Pages, repo `dmoney081/the-130-wall`, branch `main`, root).
 
@@ -16,7 +16,7 @@ Live: https://dmoney081.github.io/the-130-wall/ (GitHub Pages, repo `dmoney081/t
 - `admin/wall.py`: `status | payment (alias itch, kofi) | add | tip | pixel | member | archive | publish`.
 - `hire/`: Pixel Pal ($5) and Tiny Site ($15). Same pattern: pay on itch, then a prefilled mailto sends the brief
   (subject `Order H-XXXX · Pixel Pal|Tiny Site`).
-- `kit/`: Goal Wall Kit, sold on itch.io (https://secretwall.itch.io/goal-wall-kit, $7 minimum, pay more if you like). Memberships are still "coming back soon".
+- `kit/`: Goal Wall Kit, sold on itch.io (https://secretwall.itch.io/goal-wall-kit, $7 minimum, pay more if you like). Memberships are on Ko-fi tiers.
 - `assets/og.png` (social card), `assets/favicon.png`, `assets/og.html` (card source).
 - `LAUNCH.md`: launch copy drafts. Nothing has been posted.
 
