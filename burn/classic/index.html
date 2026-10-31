@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<link rel="canonical" href="https://dmoney081.github.io/the-130-wall/burn/">
+<title>BURN RATE Classic (v1)</title>
+<meta name="description" content="Play today's card run. A free 2-minute daily card game: make rent in 25 days, one card a day. Same deck for everyone each day.">
+<meta property="og:title" content="BURN RATE: play today's card run">
+<meta property="og:description" content="A free 2-minute daily card game. Same deck for everyone today. Shady cards tempt you; smart play wins.">
+<meta property="og:image" content="https://dmoney081.github.io/the-130-wall/burn/classic/og.png">
+<meta property="og:url" content="https://dmoney081.github.io/the-130-wall/burn/classic/">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="../../assets/favicon.png">
+<link rel="stylesheet" href="burn.css">
+</head>
+<body>
+<header class="top"><div class="brand"><a href="../../">SECRET<span class="muted">/burn-rate/classic</span></a></div><div class="muted small" id="mode"></div></header>
+<main>
+  <p class="newver" style="margin:0 0 12px;padding:10px 12px;border:1px solid #c6ff3d55;border-radius:10px;background:#c6ff3d12">This is the original Burn Rate (v1), kept for old links. <a href="../"><b>Play the new Burn Rate &rarr;</b></a></p>
+  <div id="intro">
+    <h1>Play today's card run: <span class="hl">25 days</span>, <span class="hl">$130</span>, one card a day.</h1>
+    <p>You run a one-person shop and the rent is due. Each day, play one card: ship things, grow an audience, earn trust, and don't run out of energy. Shady cards tempt you with quick wins; smart play wins.</p>
+    <p class="small">A free 2-minute daily game. Everyone gets the same deck each day, so you can compare runs with friends.</p>
+    <p class="challenge" id="challenge" hidden></p>
+    <div class="row"><button class="btn" id="play-daily">Play today's run</button><button class="btn ghost" id="play-free">Random run</button><button class="btn ghost" id="play-rush">Rush run ⏳</button></div>
+    <p class="small" id="streak"></p>
+    <p class="small">Rush run: same game, but you get 6 seconds to pick each day's card or the day slips by.</p>
+  </div>
+  <div id="game" hidden>
+    <div class="stats">
+      <div class="stat"><div class="k">Day</div><div class="v" id="s-day">1</div></div>
+      <div class="stat cash"><div class="k">Earned</div><div class="v" id="s-cash">$0</div><div class="meter"><i id="m-cash"></i></div></div>
+      <div class="stat cmp"><div class="k">Energy</div><div class="v" id="s-cmp">100</div><div class="meter"><i id="m-cmp"></i></div></div>
+      <div class="stat"><div class="k">Trust</div><div class="v" id="s-trust">50</div><div class="meter"><i id="m-trust"></i></div></div>
+      <div class="stat"><div class="k">Audience</div><div class="v" id="s-aud">0</div></div>
+    </div>
+    <div class="timer" id="timer" hidden><i id="t-fill"></i></div>
+    <div class="log" id="log"></div>
+    <div class="cards" id="cards"></div>
+    <div class="days" id="trail"></div>
+    <p class="pace" id="s-pace"></p>
+    <p class="small">Products: <b id="s-prod">0</b> · Quality: <b id="s-q">0</b> · Sales depend on audience × trust × what you've shipped. Energy drains 3 a day.</p>
+  </div>
+  <div id="end" hidden></div>
+  <details><summary>How it works</summary>
+    <p>Sales depend on audience × trust × what you've shipped, and every day costs energy. Shady cards pay fast but cost trust, and two of them end the run. Random events can help or hurt; the daily run gives everyone the same ones.</p>
+    <p>The numbers are made up and tuned for fun.</p>
+  </details>
+  <details id="credits"><summary>Supporters</summary>
+    <p class="small">Members who keep Burn Rate and the Wall going. Thank you.</p>
+    <ul id="credit-list"><li>Loading…</li></ul>
+  </details>
+</main>
+<footer>BURN RATE is free, by Secret, also home of <a href="../../">the Wall</a>. Made with AI assistance. Like it? <a href="https://secretwall.itch.io/burn-rate/donate" target="_blank" rel="noopener">Tip on itch.io</a> · <a href="https://ko-fi.com/secretwall" target="_blank" rel="noopener">Ko-fi</a> · <a href="https://ko-fi.com/secretwall/tiers" target="_blank" rel="noopener">Memberships</a> · <a href="../kit/">Wall Kit</a> · <a href="../hire/">Pixel avatars &amp; tiny sites</a> · <a href="../hire/#toy">Free Pixel Pal maker</a></footer>
+<script src="game.js"></script>
+<script>
+fetch('../../credits.json?v='+Date.now()).then(r=>r.ok?r.json():[]).then(c=>{
+  const e=s=>String(s).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
+  document.getElementById('credit-list').innerHTML=c.length?c.map(x=>`<li>${e(x.name)}${x.tier?' · '+e(x.tier):''}${x.since?' · since '+e(x.since):''}</li>`).join(''):'<li>No supporters listed yet. You can <a href="https://secretwall.itch.io/burn-rate/donate" target="_blank" rel="noopener">tip any amount on itch.io</a> or <a href="https://ko-fi.com/secretwall/tiers" target="_blank" rel="noopener">become a member on Ko-fi</a>.</li>';
+}).catch(()=>{document.getElementById('credit-list').innerHTML='<li>Credits unavailable right now.</li>';});
+</script>
+</body>
+</html>

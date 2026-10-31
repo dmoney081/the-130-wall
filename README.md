@@ -1,7 +1,7 @@
 # The Wall, by Secret
 
 A static site: a community wall of 50 tiles, priced $1→$5 by sales tier. The progress bar target is `goal_usd` in `config.json`;
-the tile that fills the bar gets a crown. Also hosts BURN RATE (`burn/`), the Goal Wall Kit page (`kit/`) and commissions (`hire/`).
+the tile that fills the bar gets a crown. Also hosts BURN RATE (`burn/`, v2: a little deckbuilder where a robot runs an online shop and pays 5 power bills in 25 days; static build, no external requests except anonymous play counters; the original v1 lives at `burn/classic/`), the Goal Wall Kit page (`kit/`) and commissions (`hire/`).
 Payment goes through the **itch.io donate page** https://secretwall.itch.io/burn-rate/donate (PayPal checkout,
 any amount, $3 prefilled, quick buttons $1/$2/$5/$10; no amount URL parameter, so the site states the amount).
 The buyer then emails their tile details (prefilled mailto). The operator matches payment to claim email, adds the

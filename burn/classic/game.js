@@ -1,9 +1,9 @@
 (function(){
 const $=id=>document.getElementById(id);
-const GOAL=130, DAYS=25, HOME='https://dmoney081.github.io/the-130-wall/', SITE=HOME+'burn/';
+const GOAL=130, DAYS=25, HOME='https://dmoney081.github.io/the-130-wall/', SITE=HOME+'burn/classic/';
 // Same file runs on the site, on itch.io (absolute links) and on game portals (BURN_PORTAL: no outside links at all).
 const PORTAL=!!window.BURN_PORTAL, ONSITE=/dmoney081\.github\.io\/the-130-wall\//.test(location.href)||/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-const BASE=ONSITE?'../':HOME, TGT=ONSITE?'':' target="_blank" rel="noopener"';
+const BASE=ONSITE?'../../':HOME, TGT=ONSITE?'':' target="_blank" rel="noopener"';
 const TIP='https://secretwall.itch.io/burn-rate/donate', ITCH='https://secretwall.itch.io/burn-rate', RUSH_MS=6000;
 function rng(seed){return function(){seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 function hash(s){let h=2166136261;for(const c of s){h^=c.charCodeAt(0);h=Math.imul(h,16777619)}return h>>>0}
