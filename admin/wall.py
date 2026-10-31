@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Ops CLI for the $130 Wall. Payments go through the itch.io donate page (https://secretwall.itch.io/burn-rate/donate,
+"""Ops CLI for the Wall. Payments go through the itch.io donate page (https://secretwall.itch.io/burn-rate/donate,
 PayPal checkout). Buyers pay the tile price there, then email their claim (subject "Tile claim S-XXXX", first line
 is the one-line claim) to secretwall@mail.grokbot.com. Match the payment notification to the claim email, then `add`.
 (Ko-fi was the old checkout; it is offline. The `kofi` subcommand name is kept as an alias of `payment`.)

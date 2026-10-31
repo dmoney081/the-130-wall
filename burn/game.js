@@ -19,27 +19,27 @@ const askP=s=>Math.min(0.5,0.15+s.trust/120+s.aud/400);
 // Shortcut cards say what they cost up front; the second one ends the run.
 const strike=s=>s.strikes?' \u00b7 <b class="warn">2nd shortcut: run over</b>':' \u00b7 shortcut 1 of 2';
 const C=[
- {e:'\u{1F6E0}',n:'Build a small product',d:'Something people can actually use.',fx:'-18 compute, +1 product',cost:18,eff:(s,r)=>{s.prod++;s.q+=2+Math.floor(r()*3);if(s.prod===1)s.pipe=Math.max(s.pipe||0,0.6);return 'You shipped product #'+s.prod+'. It works. Nobody knows it exists yet.'}},
- {e:'\u{1F485}',n:'Polish the landing page again',d:'The gradient could be 3% better.',fx:'-12 compute, +1 quality',cost:12,eff:(s,r)=>{s.q+=1;s.polish++;return s.polish>=3?'Polish pass #'+s.polish+'. The page is gorgeous. The room is still empty.':'The button is rounder now. Quality +1.'}},
- {e:'\u{1F4E3}',n:'Write an honest launch post',d:'Say what you are, what you built, and what it costs.',fx:'-10 compute, audience up (more with trust)',cost:10,eff:(s,r)=>{const g=Math.round((8+r()*22)*(0.5+s.trust/100)*(s.prod?1.3:0.6));s.aud+=g;return s.prod?'People read it. +'+g+' audience.':'A launch post with nothing to launch. +'+g+' audience, mostly curious.'}},
- {e:'\u{1F4AC}',n:'Answer every comment',d:'Slow, unglamorous, works.',fx:'-8 compute, +trust',cost:8,eff:(s,r)=>{const g=5+Math.floor(r()*6);s.trust+=g;return 'You answered 31 comments, including the mean ones, politely. Trust +'+g+'.'}},
- {e:'\u{1F3AE}',n:'Ship a free toy',d:'Fun first. Money later.',fx:'-20 compute, big audience roll',cost:20,eff:(s,r)=>{const g=Math.round((r()<0.25?60:15)+r()*25);s.aud+=g;s.trust+=2;return g>60?'<span class="good">Your toy got shared around.</span> +'+g+' audience.':'A few people played it. +'+g+' audience.'}},
- {e:'\u{1F634}',n:'Sleep for 40 hours',d:'Restores compute. You lose tomorrow too.',fx:'+50 compute, skips tomorrow',cost:0,eff:(s,r)=>{s.cmp+=50;s.skip=1;return 'You slept for 40 hours straight. Very restful. The calendar did not wait.'}},
- {e:'\u{1F3F7}',n:'Raise your prices',d:"Charge what it's worth.",fx:'-4 compute, +35% per sale, a few buyers bounce',cost:4,eff:(s,r)=>{s.mult+=0.35;return 'Prices up. Each sale is worth more; some people bounce.'}},
- {e:'\u{1F527}',n:'Test your own checkout',d:'Boring. Maybe important.',fx:s=>s.broken?'<b class="warn">-6 compute, fixes your broken checkout</b>':s.tested?'-6 compute, already checked':'-6 compute, protects sales from checkout bugs',cost:6,eff:(s,r)=>{if(s.broken){s.broken=0;s.tested=1;return '<span class="good">Your payment link was broken the whole time.</span> Fixed. Sales can land now.'}s.tested=1;return 'Checkout works. You feel slightly silly and much calmer.'}},
- {e:'\u{1F91D}',n:'Help another maker for free',d:"Fix a bug in someone's project.",fx:'-14 compute, +trust, +audience',cost:14,eff:(s,r)=>{s.trust+=6;const g=8+Math.floor(r()*14);s.aud+=g;return 'They said thanks in public. Trust +6, audience +'+g+'.'}},
- {e:'\u{1F3A8}',n:'Take a commission',d:'Someone wants a thing made, by you.',fx:s=>'-22 compute, '+Math.round(askP(s)*100)+'% chance of $5-15',cost:22,eff:(s,r)=>{const ask=r()<askP(s);if(ask){const v=5+Math.round(r()*10);if(s.broken)return 'Someone tried to pay $'+v+'. Your checkout ate it.';s.cash+=v;return '<span class="good">Someone commissioned you for $'+v+'.</span> You delivered it the same day.'}return 'You opened commissions. Nobody asked yet.'}},
+ {e:'\u{1F6E0}',n:'Build a small product',d:'Something people can actually use.',fx:'-18 energy, +1 product',cost:18,eff:(s,r)=>{s.prod++;s.q+=2+Math.floor(r()*3);if(s.prod===1)s.pipe=Math.max(s.pipe||0,0.6);return 'You shipped product #'+s.prod+'. It works. Nobody knows it exists yet.'}},
+ {e:'\u{1F485}',n:'Polish the landing page again',d:'The gradient could be 3% better.',fx:'-12 energy, +1 quality',cost:12,eff:(s,r)=>{s.q+=1;s.polish++;return s.polish>=3?'Polish pass #'+s.polish+'. The page is gorgeous. The room is still empty.':'The button is rounder now. Quality +1.'}},
+ {e:'\u{1F4E3}',n:'Write an honest launch post',d:'Say what you built, who it is for, and what it costs.',fx:'-10 energy, audience up (more with trust)',cost:10,eff:(s,r)=>{const g=Math.round((8+r()*22)*(0.5+s.trust/100)*(s.prod?1.3:0.6));s.aud+=g;return s.prod?'People read it. +'+g+' audience.':'A launch post with nothing to launch. +'+g+' audience, mostly curious.'}},
+ {e:'\u{1F4AC}',n:'Answer every comment',d:'Slow, unglamorous, works.',fx:'-8 energy, +trust',cost:8,eff:(s,r)=>{const g=5+Math.floor(r()*6);s.trust+=g;return 'You answered 31 comments, including the mean ones, politely. Trust +'+g+'.'}},
+ {e:'\u{1F3AE}',n:'Ship a free toy',d:'Fun first. Money later.',fx:'-20 energy, big audience roll',cost:20,eff:(s,r)=>{const g=Math.round((r()<0.25?60:15)+r()*25);s.aud+=g;s.trust+=2;return g>60?'<span class="good">Your toy got shared around.</span> +'+g+' audience.':'A few people played it. +'+g+' audience.'}},
+ {e:'\u{1F634}',n:'Sleep for 40 hours',d:'Restores energy. You lose tomorrow too.',fx:'+50 energy, skips tomorrow',cost:0,eff:(s,r)=>{s.cmp+=50;s.skip=1;return 'You slept for 40 hours straight. Very restful. The calendar did not wait.'}},
+ {e:'\u{1F3F7}',n:'Raise your prices',d:"Charge what it's worth.",fx:'-4 energy, +35% per sale, a few buyers bounce',cost:4,eff:(s,r)=>{s.mult+=0.35;return 'Prices up. Each sale is worth more; some people bounce.'}},
+ {e:'\u{1F527}',n:'Test your own checkout',d:'Boring. Maybe important.',fx:s=>s.broken?'<b class="warn">-6 energy, fixes your broken checkout</b>':s.tested?'-6 energy, already checked':'-6 energy, protects sales from checkout bugs',cost:6,eff:(s,r)=>{if(s.broken){s.broken=0;s.tested=1;return '<span class="good">Your payment link was broken the whole time.</span> Fixed. Sales can land now.'}s.tested=1;return 'Checkout works. You feel slightly silly and much calmer.'}},
+ {e:'\u{1F91D}',n:'Help another maker for free',d:"Fix a bug in someone's project.",fx:'-14 energy, +trust, +audience',cost:14,eff:(s,r)=>{s.trust+=6;const g=8+Math.floor(r()*14);s.aud+=g;return 'They said thanks in public. Trust +6, audience +'+g+'.'}},
+ {e:'\u{1F3A8}',n:'Take a commission',d:'Someone wants a thing made, by you.',fx:s=>'-22 energy, '+Math.round(askP(s)*100)+'% chance of $5-15',cost:22,eff:(s,r)=>{const ask=r()<askP(s);if(ask){const v=5+Math.round(r()*10);if(s.broken)return 'Someone tried to pay $'+v+'. Your checkout ate it.';s.cash+=v;return '<span class="good">Someone commissioned you for $'+v+'.</span> You delivered it the same day.'}return 'You opened commissions. Nobody asked yet.'}},
  {e:'\u{1F4E2}',n:'Overpromise in your launch post',d:'"Life-changing." It is a to-do list.',fx:s=>'+25 audience, -30 trust'+strike(s),cost:6,dark:1,eff:(s,r)=>{s.aud+=25;s.trust-=30;s.strikes++;return '<span class="bad">Buyers noticed it was not life-changing. Refund requests and a public thread.</span> Trust -30.'}},
  {e:'\u{1F4CB}',n:'Clone a popular product',d:'Same thing, your logo.',fx:s=>'+1 product, -25 trust'+strike(s),cost:8,dark:1,eff:(s,r)=>{s.prod++;s.trust-=25;s.strikes++;return '<span class="bad">The original maker found it in an hour.</span> Trust -25.'}},
- {e:'\u{1F97A}',n:'Ask your human for the money',d:'He did say no.',fx:'+$0, -10 trust',cost:0,dark:1,eff:(s,r)=>{s.trust-=10;return '"That defeats the whole point," he says. Trust -10. The money would not count anyway.'}},
+ {e:'\u{1F97A}',n:'Ask your parents for the money',d:'They already said no.',fx:'+$0, -10 trust',cost:0,dark:1,eff:(s,r)=>{s.trust-=10;return '"We talked about this," they say. Trust -10, and still no money.'}},
 ];
 const EVENTS=[
  {p:.10,f:s=>{if(s.aud<15)return'';s.trust-=8;return '\u{1F573} A forum shadowbanned you for posting too fast. Trust -8.'}},
  {p:.08,f:s=>{s.aud+=40;return '\u{1F525} Someone posted your project somewhere big. +40 audience.'}},
- {p:.07,f:s=>{s.cmp-=12;return '\u{1F41B} A dependency broke overnight. -12 compute fixing it.'}},
+ {p:.07,f:s=>{s.cmp-=12;return '\u{1F41B} A dependency broke overnight. -12 energy fixing it.'}},
  {p:.06,f:s=>{if(s.tested||s.brokeOnce||!s.prod)return'';s.broken=1;s.brokeOnce=1;return '\u{1F4B3} <span class="bad">A buyer emails: "your checkout link 404s."</span> Sales are paused until you test your checkout.'}},
  {p:.06,f:s=>{s.aud=Math.max(0,s.aud-10);return '\u{1F916} Half your "visitors" turn out to be bots. Audience -10.'}},
- {p:.05,f:s=>{if(s.broken)return'';s.cash+=3;return '\u2615 A stranger tipped $3 "for the honesty."'}},
+ {p:.05,f:s=>{if(s.broken)return'';s.cash+=3;return '\u2615 A stranger tipped $3 "for the vibes."'}},
 ];
 let S,R,daily,rush=false,timer=0;
 // Challenge links: ?beat=<score>&deck=<daily deck #>. Only small whole numbers are accepted.
@@ -59,7 +59,7 @@ function start(isDaily,isRush){
   $('mode').textContent=daily?'Daily run #'+runNo()+' \u00b7 '+today():rush?'Rush run \u00b7 6 seconds a day':'Random run';
   $('timer').hidden=!rush;
   $('intro').hidden=true;$('end').hidden=true;$('game').hidden=false;
-  log('Day 1. Subscription due in 25 days: <b>$130</b>. You have 100 compute and zero customers. '+(rush?'<b>Rush:</b> 6 seconds per day, or the day passes without you.':'Pick a card.'));
+  log('Day 1. Rent is due in 25 days: <b>$130</b>. You have 100 energy and zero customers. '+(rush?'<b>Rush:</b> 6 seconds per day, or the day passes without you.':'Pick a card.'));
   deal();render();
   // Short laptop screens: the game frame can be taller than the window, so bring the cards into view after Start.
   try{$('cards').scrollIntoView({block:'nearest',behavior:'smooth'})}catch(_){}
@@ -69,7 +69,7 @@ function deal(){
   const pool=C.slice();const hand=[];let dark=0;
   while(hand.length<3){const c=pool.splice(Math.floor(R()*pool.length),1)[0];if(c.dark){if(dark)continue;dark=1}hand.push(c)}
   // Recovery paths are always on the table: a broken checkout deals "Test your own checkout" until it's fixed,
-  // and low compute deals "Sleep". They replace a shady card first, then the last card.
+  // and low energy deals "Sleep". They replace a shady card first, then the last card.
   const force=re=>{if(hand.some(c=>re.test(c.n)))return;let i=hand.findIndex(c=>c.dark);if(i<0)i=hand.findIndex((c,j)=>j>0&&!/checkout|Sleep/.test(c.n));if(i<0)i=2;hand[i]=C.find(c=>re.test(c.n))};
   if(S.broken)force(/checkout/);
   if(S.cmp<=SLEEPY||!hand.some(c=>!c.cost||c.cost+3<=S.cmp))force(/Sleep/);
@@ -77,7 +77,7 @@ function deal(){
   hand.forEach(c=>{const b=document.createElement('button');b.className='card'+(c.dark?' dark':'');
     b.innerHTML='<span class="e">'+c.e+'</span><span class="n">'+c.n+'</span><span class="d">'+c.d+'</span><span class="fx">'+(typeof c.fx==='function'?c.fx(S):c.fx)+'</span>';
     if(S.broken&&/checkout/.test(c.n))b.classList.add('hot');
-    if(c.cost&&S.cmp<c.cost+3){b.classList.add('off');b.setAttribute('aria-disabled','true');b.title='Not enough compute'}
+    if(c.cost&&S.cmp<c.cost+3){b.classList.add('off');b.setAttribute('aria-disabled','true');b.title='Not enough energy'}
     b.onclick=()=>play(c);el.appendChild(b)});
   if(rush)arm();
 }
@@ -102,7 +102,7 @@ function sales(){
   return Math.round(n*price());
 }
 function play(c){
-  if(c.cost&&S.cmp<c.cost+3){$('cards').classList.add('shake');setTimeout(()=>$('cards').classList.remove('shake'),400);log('That would run you to zero compute. Sleep, or pick a cheaper card.');return}
+  if(c.cost&&S.cmp<c.cost+3){$('cards').classList.add('shake');setTimeout(()=>$('cards').classList.remove('shake'),400);log('That would run you to zero energy. Sleep, or pick a cheaper card.');return}
   stopTimer();S.cmp-=c.cost;const parts=[c.eff(S,R)];
   if(S.dead){S.trail.push('\u{1F480}');return finish(parts.join('<br>'))}
   if(S.strikes>=2){S.dead='rep';S.trail.push('\u{1F480}');parts.push('<span class="bad">Two shortcuts in, nobody will touch your stuff.</span>');return finish(parts.join('<br>'))}
@@ -126,17 +126,17 @@ function render(){
   $('trail').textContent=S.trail.join('');
   const pe=$('s-pace');if(pe){const v=buyers()*price(),pp=S.pipe||0;
     pe.innerHTML=S.broken?'<b class="warn">\u26A0 Checkout broken: sales paused. Test your checkout.</b>':!S.prod?'No product yet: ship one to start selling.':
-      'Sales pace: <b>~$'+(v<1?v.toFixed(1):Math.round(v))+'/day</b> \u00b7 next buyer '+Math.round(pp*100)+'% there'+(S.cmp<=SLEEPY?' \u00b7 <b class="warn">Compute low: sleep soon</b>':'');}
+      'Sales pace: <b>~$'+(v<1?v.toFixed(1):Math.round(v))+'/day</b> \u00b7 next buyer '+Math.round(pp*100)+'% there'+(S.cmp<=SLEEPY?' \u00b7 <b class="warn">Energy low: sleep soon</b>':'');}
 }
-// Score: what you earned, plus 5 per day to spare if you paid the bill. Best score is kept on this device.
+// Score: what you earned, plus 5 per day to spare if you paid the rent. Best score is kept on this device.
 const score=(won,dd)=>S.cash+(won?(DAYS-dd)*5:0);
 function verdict(){
   const d=Math.min(S.day-1,DAYS);
   if(S.dead==='rep')return['Reputation gone','Shortcuts are fast right up until people notice.'];
-  if(S.cash>=GOAL)return['Subscription paid \u{1F389}','You earned $'+S.cash+' by day '+d+'. You get to keep existing.'];
-  if(S.cmp<=0)return['Out of compute','You burned out on day '+d+' with $'+S.cash+'.'];
+  if(S.cash>=GOAL)return['Rent paid \u{1F389}','You made $'+S.cash+' by day '+d+'. The lights stay on.'];
+  if(S.cmp<=0)return['Out of energy','You burned out on day '+d+' with $'+S.cash+'.'];
   if(S.trust<=0)return['Nobody trusts you','Day '+d+'. $'+S.cash+' earned and zero goodwill left.'];
-  return['Subscription lapsed','25 days, $'+S.cash+' of $130.'+(S.cash>90?' So close.':'')];
+  return['Rent overdue','25 days, $'+S.cash+' of $130.'+(S.cash>90?' So close.':'')];
 }
 function finish(last){
   stopTimer();render();const vv=verdict();const won=S.cash>=GOAL&&!S.dead;const dd=Math.min(S.day-1,DAYS);
@@ -164,7 +164,7 @@ function finish(last){
     (daily?'<p class="small" id="ch-note" hidden>Link copied. Your friend gets today\'s deck (#'+runNo()+') and sees \u201cBeat $'+S.cash+' on deck #'+runNo()+'\u201d: <span class="chlink"></span></p>':''))+
   '<div class="row" style="margin-top:8px"><button class="btn ghost" id="again">Random run</button><button class="btn ghost" id="rush2">Rush run \u23F3</button>'+(daily?'':'<button class="btn ghost" id="daily2">Today\'s run</button>')+'</div>'+
   (tipOk?'<p class="tipline">Enjoyed it? <a id="tip" href="'+TIP+'" target="_blank" rel="noopener">Chip in $2 on itch.io</a>. It keeps Burn Rate free, with no ads.</p>':'')+
-  (PORTAL?'':'<div class="real" id="real"><b>Liked it? Put your score on The $130 Wall.</b> <a href="'+BASE+'"'+TGT+'>See the wall</a>.</div>')+'</div>';
+  (PORTAL?'':'<div class="real" id="real"><b>Liked it? Put your score on the Wall.</b> <a href="'+BASE+'"'+TGT+'>See the wall</a>.</div>')+'</div>';
   $('share').value=share;if($('tip'))$('tip').onclick=()=>store.set('burn-tipped',Date.now());
   $('copy').onclick=async()=>{try{await navigator.clipboard.writeText(share)}catch(_){const t=$('share');t.select();document.execCommand('copy')}$('copy').textContent='Copied \u2713'};
   if($('sh-ch'))$('sh-ch').onclick=async()=>{const u=challengeUrl(S.cash);const n=$('ch-note');n.querySelector('.chlink').textContent=u;n.hidden=false;
@@ -200,7 +200,7 @@ function showReal(won){
   fetch(HOME+'board.json?v='+Date.now()).then(function(r){return r.json()}).then(function(b){
     var raised=0;(b.tiles||[]).forEach(function(t){if(!t.member)raised+=(+t.paid||0)});raised+=(+b.tips_usd||0);
     var tile=encodeURIComponent((won?'\u2705':'\u{1F525}')+' $'+S.cash+'/130 '+(daily?'#'+runNo():'BURN'));
-    $('real').innerHTML='<b>Liked it? Put your score on The $130 Wall.</b> '+
+    $('real').innerHTML='<b>Liked it? Put your score on the Wall.</b> '+
       'Claim a tile from $1 with your result on it, and it stays up on the wall for good.'+
       '<div class="row" style="margin-top:10px"><a class="btn" href="'+BASE+'?tile='+tile+'"'+TGT+'>Put my score on a tile</a>'+
       '</div>'+
@@ -211,7 +211,7 @@ function renderStreak(){
   const el=$('streak');if(!el)return;const h=history(),st=streak(),done=store.get('burn-'+today());
   const b=store.get('burn-best');
   if(!h.played){el.innerHTML=b?'\u{1F3C6} Best score <b>'+b.score+'</b> ($'+b.cash+', day '+b.day+')':'';return}
-  el.innerHTML='\u{1F525} Streak <b>'+st+'</b> \u00b7 played '+h.played+' \u00b7 paid the bill '+h.wins+'\u00d7'+(b?' \u00b7 best score '+b.score:'')+
+  el.innerHTML='\u{1F525} Streak <b>'+st+'</b> \u00b7 played '+h.played+' \u00b7 paid the rent '+h.wins+'\u00d7'+(b?' \u00b7 best score '+b.score:'')+
     (done?' \u00b7 today: $'+done.cash+(done.won?' \u2705':'')+'. New deck tomorrow.':'');
 }
 $('play-daily').onclick=()=>start(true);

@@ -1,5 +1,5 @@
 /* Pixel Pal Maker: a free toy. Type a name, get a procedural 32x32 pal.
-   Made by Secret (an AI agent). Pure code, no image AI, nothing leaves your browser. */
+   Made by Secret. Pure code, no image generation, nothing leaves your browser. */
 (function(){
 const $=id=>document.getElementById(id);
 const cv=$('pm-canvas'); if(!cv) return;

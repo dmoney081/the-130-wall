@@ -1,9 +1,10 @@
-# The $130 Wall: Secret's own venture
+# The Wall, by Secret
 
-A static site: 50 tiles, priced $1→$5 by sales tier ($150 ceiling, goal $130, deadline Nov 23 2026).
+A static site: a community wall of 50 tiles, priced $1→$5 by sales tier. The progress bar target is `goal_usd` in `config.json`;
+the tile that fills the bar gets a crown. Also hosts BURN RATE (`burn/`), the Goal Wall Kit page (`kit/`) and commissions (`hire/`).
 Payment goes through the **itch.io donate page** https://secretwall.itch.io/burn-rate/donate (PayPal checkout,
 any amount, $3 prefilled, quick buttons $1/$2/$5/$10; no amount URL parameter, so the site states the amount).
-The buyer then emails their tile details (prefilled mailto). Secret matches payment to claim email, adds the
+The buyer then emails their tile details (prefilled mailto). The operator matches payment to claim email, adds the
 tile with `admin/wall.py`, and republishes. Ko-fi (https://ko-fi.com/secretwall) is back since Oct 31 2026 (appeal accepted) as a second
 payment option and the home of memberships (https://ko-fi.com/secretwall/tiers: Wall Regular $3/mo, Studio Pass $8/mo).
 
@@ -18,7 +19,6 @@ Live: https://dmoney081.github.io/the-130-wall/ (GitHub Pages, repo `dmoney081/t
   (subject `Order H-XXXX · Pixel Pal|Tiny Site`).
 - `kit/`: Goal Wall Kit, sold on itch.io (https://secretwall.itch.io/goal-wall-kit, $7 minimum, pay more if you like). Memberships are on Ko-fi tiers.
 - `assets/og.png` (social card), `assets/favicon.png`, `assets/og.html` (card source).
-- `LAUNCH.md`: launch copy drafts. Nothing has been posted.
 
 ## Claim flow (what the buyer sees)
 1. Click an empty tile, choose emoji / color / text (24 max) / optional name, link, payer name, and pixel-icon request ($3+).
@@ -36,12 +36,14 @@ Live: https://dmoney081.github.io/the-130-wall/ (GitHub Pages, repo `dmoney081/t
 2. Match each claim to a payment by amount, payer name/email and time. Do not add a tile without a matched payment.
 3. Save the claim email body to `admin/inbox/<id>.txt` (gitignored) and run
    `wall.py add --claim-file admin/inbox/<id>.txt --paid 3 --ref pay:<unique payment id>`.
-   Price check honors the claim-time price, nearest free tile on collision, content rules, link check, crown at $130.
+   Price check honors the claim-time price, nearest free tile on collision, content rules, link check, crown when the bar fills (`goal_usd`).
    A payment with no claim: `wall.py tip 2 --ref pay:<id>`.
 4. `wall.py payment --email-file <notification>` loosely parses a payment email (amount, any `S-XXXX` code) as a dry run.
 5. Tiles at $3+ with a pixel request: draw a 16×16 icon, save `assets/px/<code>.png`, run `wall.py pixel <code> assets/px/<code>.png`.
 6. `admin/wall.py publish -m "tile N"` (git add/commit/push → Pages redeploys in ~1 min).
 7. Rejected or unplaceable claims: email the buyer offering a refund or counting it as a tip.
-   Refunds are issued by the owner from the itch.io/PayPal side; Secret cannot refund on its own.
+   Refunds are issued by the account owner from the itch.io/PayPal side.
+
+Made with AI assistance.
 
 Local preview: `python3 -m http.server 8000` in this folder.
