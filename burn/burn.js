@@ -1091,6 +1091,7 @@ const MX = (function () {
     // session length: visible time until the tab is first hidden or closed
     let act = 0, since = document.hidden ? 0 : performance.now(), done = false;
     const flush = () => { if (done) return; if (since) act += performance.now() - since; since = 0; done = true; const mn = act / 6e4;
+      if (mn >= 4) hit('session_4m-plus');
       hit(mn < 1 ? 'session_0-1m' : mn < 3 ? 'session_1-3m' : mn < 10 ? 'session_3-10m' : mn < 30 ? 'session_10-30m' : 'session_30m-plus'); };
     document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
     window.addEventListener('pagehide', flush);
@@ -1211,11 +1212,12 @@ function hubHTML() {
   h += '<div class="hub-l"><div class="logo">BURN <b>RATE</b><span class="fire">' + ic('burn') + '</span></div><div class="tagline">Pay the power bill or get unplugged.</div>';
   h += '<div class="botwrap">' + A.bot(dd && dd.won ? 'happy' : 'idle', skin) + '</div>';
   h += '<div class="lvlbox panel"><div class="row"><b>Level ' + L.lvl + '</b><span class="muted" style="margin-left:auto;font-size:13px">' + L.into + ' / ' + L.need + ' XP</span></div><div class="xpbar"><i style="width:' + Math.round(100 * L.into / L.need) + '%"></i></div>' +
-    (nu ? '<div class="muted" style="font-size:12px">Next: <b>' + esc(nu[3]) + '</b> at level ' + nu[0] + '</div>' : '<div class="muted" style="font-size:12px">Everything unlocked. Chase the board.</div>') + '</div>' + (LINKS.foot ? '<div class="foot"><a href="' + esc(LINKS.foot.href) + '" target="_blank" rel="noopener">' + esc(LINKS.foot.text) + '</a></div>' : '') + '</div>';
+    (nu ? '<div class="muted" style="font-size:12px">Next: <b>' + esc(nu[3]) + '</b> at level ' + nu[0] + '</div>' : '<div class="muted" style="font-size:12px">Everything unlocked. Chase the board.</div>') + '</div>' +
+    (dd && !dd.v1 || stk ? '<div class="cbhub panel" id="h-comeback"><div>' + streakLine() + '</div>' + (dd && !dd.v1 && teaseLine() ? '<div class="muted">' + teaseLine() + '</div>' : '') + '</div>' : '') + (LINKS.foot ? '<div class="foot"><a href="' + esc(LINKS.foot.href) + '" target="_blank" rel="noopener">' + esc(LINKS.foot.text) + '</a></div>' : '') + '</div>';
   h += '<div class="hub-r">';
   if (challenge) h += '<button type="button" class="mode challenge" data-go="challenge"><span class="mi">' + ic('trophy') + '</span><span><span class="mt">Beat ' + money(challenge.p.score) + '</span><br><span class="ms">A friend\u2019s ' + esc(modeLabel({ mode: challenge.p.mode, seedDay: challenge.day })) + ' run. Same deck, same luck.</span></span><span class="go">PLAY</span></button>';
   if (P.last && P.last.ctx) h += '<button type="button" class="mode cont" data-go="continue"><span class="mi">' + ic('play') + '</span><span><span class="mt">Continue</span><br><span class="ms">' + esc(P.last.ctx.label || 'Your run') + ' · day ' + (P.last.day || '?') + '</span></span><span class="go">RESUME</span></button>';
-  h += '<button type="button" class="mode daily" data-go="daily"><span class="mi">' + ic('cal') + '</span><span><span class="mt">Daily #' + dailyNo() + '</span><br><span class="ms">' + (dd && !dd.v1 ? 'Done: ' + money(dd.score) + (dd.won ? ' · won' : '') + '. Replay for the board.' : 'Same deck for everyone today.') + (stk ? ' · ' + stk + '-day streak' : '') + '</span></span><span class="go">' + (dd && !dd.v1 ? 'REPLAY' : 'PLAY') + '</span></button>';
+  h += '<button type="button" class="mode daily" data-go="daily"><span class="mi">' + ic('cal') + '</span><span><span class="mt">Daily #' + dailyNo() + '</span><br><span class="ms">' + (dd && !dd.v1 ? 'Done: ' + money(dd.score) + (dd.won ? ' · won' : '') + '. Next deck in <span class="cd-next">' + leftText(msToNextDaily()) + '</span>.' : 'Same deck for everyone today.' + (stk ? ' Keep your ' + stk + '-day streak.' : '')) + '</span></span><span class="go">' + (dd && !dd.v1 ? 'REPLAY' : 'PLAY') + '</span></button>';
   h += '<button type="button" class="mode run" data-go="run"><span class="mi">' + ic('rocket') + '</span><span><span class="mt">Run</span><br><span class="ms">Pick a founder and a Burn level. New deck each time.</span></span><span class="go">SET UP</span></button>';
   h += '<button type="button" class="mode rush" data-go="rush"><span class="mi">' + ic('clock') + '</span><span><span class="mt">Rush</span><br><span class="ms">20 seconds a day. Think fast.</span></span><span class="go">GO</span></button>';
   h += '<div class="hub-nav">' + [['board', 'trophy', 'Board'], ['cards', 'card', 'Cards'], ['awards', 'star2', 'Awards'], ['desk', 'crown', 'Desk'], ['codes', 'tag', 'Codes'], ['help', 'book', 'How to'], ['settings', 'gear', 'Settings']].map(b => '<button type="button" class="btn" data-nav="' + b[0] + '" aria-label="' + b[2] + '">' + ic(b[1]) + '<span class="hl">' + b[2] + '</span></button>').join('') + '</div>';
@@ -1333,6 +1335,36 @@ function ghostFor(opts) {
   const s = B.runBot('sensible', opts, 3000, 0); const by = []; let t = 0; s.days.forEach(d => { t += d.rev; by.push(t); });
   return (ghostCache[key] = { total: s.earned, by, day: s.day, result: s.result });
 }
+// ---------- come-back hook: next-Daily countdown, Daily streak, tomorrow's teaser ----------
+function msToNextDaily() { const n = new Date(), m = new Date(n); m.setHours(24, 0, 0, 0); return Math.max(0, m - n); }
+function leftText(ms) { const t = Math.max(1, Math.ceil(ms / 6e4)), h = Math.floor(t / 60), m = t % 60; return h ? h + 'h ' + m + 'm' : m + 'm'; }
+const teaseCache = {};
+function teaseFor(day) { // the best card in that deck's first draft (offers are seeded by deck + day, so everyone sees the same one)
+  if (day in teaseCache) return teaseCache[day];
+  let out = null;
+  try { const x = C.newRun(dailyOpts(day)), pol = B.BOTS.sensible;
+    for (let n = 0; n < 200 && x.phase === 'play'; n++) C.act(x, pol(x));
+    const cs = (x.offers || []).filter(o => o.k === 'card' && C.CARDS[o.id] && C.STARTER.indexOf(o.id) < 0).sort((a, b) => C.CARDS[b.id].rar - C.CARDS[a.id].rar);
+    if (cs.length) out = C.CARDS[cs[0].id]; } catch (_) {}
+  return (teaseCache[day] = out);
+}
+function dailyDone(d) { const r = P.daily[d || todayYmd()]; return !!(r && !r.v1); }
+function streakLine() {
+  const stk = M.streak();
+  if (dailyDone()) return ic('flame2') + ' <b>' + stk + '-day Daily streak.</b> Play tomorrow to make it ' + (stk + 1) + '.';
+  return stk ? ic('flame2') + ' <b>' + stk + '-day Daily streak.</b> Play today\u2019s Daily to keep it.' : 'Play the Daily each day to build a streak.';
+}
+function teaseLine() { const t = teaseFor(M.addDays(todayYmd(), 1)); return t ? 'Tomorrow\u2019s first draft: <b>' + esc(t.n) + '</b>' + (t.rar ? ' (' + (t.rar > 1 ? 'rare' : 'uncommon') + ')' : '') + '.' : ''; }
+function comebackHTML() { // end screen, once today's Daily is done
+  const tl = teaseLine();
+  return '<div class="li comeback" id="e-comeback">' + ic('cal') + '<span class="grow" style="font-size:13px"><b>Daily #' + M.deckNo(M.addDays(todayYmd(), 1)) + ' opens in <span class="cd-next">' + leftText(msToNextDaily()) + '</span></b><br>' + streakLine() + (tl ? '<br><span class="muted">' + tl + '</span>' : '') + '</span></div>';
+}
+let cdDay = null;
+setInterval(() => {
+  const t = leftText(msToNextDaily()); document.querySelectorAll('.cd-next').forEach(e => { e.textContent = t; });
+  const d = todayYmd(); if (cdDay && d !== cdDay && !st && !ov && document.querySelector('.screen.hub')) showHub(); // a new Daily just opened
+  cdDay = d;
+}, 15000);
 let firstStart = true;
 function begin(opts, c, actions) {
   closeAll(); removeCoach();
@@ -1361,7 +1393,7 @@ function openingLine() {
   if (ctx.challenge) return 'Beat ' + money(ctx.challenge.p.score) + ' on this deck.';
   return 'Day 1. Ship something and tell people about it.';
 }
-function startDaily() { const d = todayYmd(); begin(dailyOpts(d), { mode: 'daily', seedDay: d, label: 'Daily #' + dailyNo() }); }
+function startDaily() { const d = todayYmd(); if (!dailyDone(d) && M.streak() > 0) MX.hit('daily_streak_continue'); begin(dailyOpts(d), { mode: 'daily', seedDay: d, label: 'Daily #' + dailyNo() }); }
 function startRush() { begin({ seed: rndSeed(), mode: 'rush', founder: 'tiny', burn: 0, lvl: C.FULL }, { mode: 'rush', label: 'Rush' }); }
 function startTutorial() { begin({ seed: 2026, mode: 'tutorial', founder: 'tiny', burn: 0, lvl: 0 }, { mode: 'tutorial', label: 'Tutorial' }); }
 function startRun(founder, burn) { begin({ seed: rndSeed(), mode: 'run', founder, burn, lvl: M.cardLvl() }, { mode: 'run', label: founderName(founder) + (burn ? ' · Burn ' + burn : '') }); }
@@ -1402,6 +1434,7 @@ function buildGame() {
     '<div class="blk dayblk"><div class="sub" id="g-mode">' + esc(ctx.label) + '</div><div class="big" id="g-day">Day 1</div></div>' +
     '<div class="blk billblk" id="g-billblk"><div class="row"><span class="sub">Power bill</span><span class="big num" id="g-bill">$0</span><span class="sub" id="g-due"></span></div><div class="billbar" id="g-billbar"><i></i></div></div>' +
     '<div class="blk cashblk" id="g-cashblk"><div class="sub" id="g-earned">Cash</div><div class="big num" id="g-cash">$0</div></div>' +
+    (ctx.mode === 'tutorial' ? '<button type="button" class="blk skipblk" id="g-skip">Skip tutorial</button>' : '') +
     (ctx.ghost ? '<div class="blk ghostblk" id="g-ghost"><div class="sub">' + ic('ghost') + ' BurnBot, same deck</div><div class="big num" id="g-ghostv">$0</div></div>' : '') +
     (rush ? '<div class="timer" id="g-timer" role="timer" aria-label="Seconds left today"><span id="g-timerv">20</span></div>' : '') +
     '<button type="button" class="ibtn" id="g-mute" aria-label="Mute (M)">' + ic(P.set.muted ? 'mute' : 'sound') + '</button></div>' +
@@ -1412,11 +1445,12 @@ function buildGame() {
       '<div class="stat st-burn" id="s-burn">' + ic('burn', 'i-burn') + '<div class="body"><div class="v num" id="v-burn">0</div><div class="k" id="k-burn">Burnout</div><div class="meter"><i id="m-burn"></i></div></div></div>' +
     '</div>' +
     '<div class="biz"><div class="lbl">Products</div><div class="prods" id="g-prods"></div><div class="lbl">Tools</div><div class="tools" id="g-tools"></div></div>' +
-    '<div class="center" id="g-center"><div class="botwrap" id="g-bot">' + A.bot('idle', skin) + '</div><div class="col"><div class="bubble say" id="g-bubble" aria-live="polite"></div><div class="forecast" id="g-fc"></div>' + (ctx.ghost ? '<div class="ghostline" id="g-ghost2"></div>' : '') + '</div></div>' +
+    '<div class="center" id="g-center"><div class="botwrap" id="g-bot">' + A.bot('idle', skin) + '</div><div class="col"><div class="bubble say" id="g-bubble" aria-live="polite"></div><div class="forecast" id="g-fc"></div>' + (ctx.ghost ? '<div class="ghostline" id="g-ghost2"></div>' : '') + (ctx.mode === 'tutorial' ? '<button type="button" class="btn ghostb skipline" id="g-skip2">Skip tutorial</button>' : '') + '</div></div>' +
     '<div class="handwrap" id="g-handwrap"><div class="hand" id="g-hand"></div></div>' +
     '<div class="act"><div class="cpu" id="g-cpu" aria-label="Energy"></div><div class="deckinfo"><button type="button" id="g-deck">' + ic('card') + ' Deck <b id="g-deckn">0</b></button><button type="button" id="g-disc">' + ic('reroll') + ' Used <b id="g-discn">0</b></button></div><button type="button" class="btn primary end" id="g-end">End day</button></div>' +
     '</div>';
   $('g-pause').onclick = () => { S.play('tap'); openPause(); };
+  ['g-skip', 'g-skip2'].forEach(id => { const b = $(id); if (b) b.onclick = () => { S.play('tap'); skipTutorial(); }; });
   $('g-mute').onclick = toggleMute;
   $('g-end').onclick = () => { S.play('tap'); doAct({ t: 'end' }); };
   $('g-deck').onclick = () => { S.play('tap'); pileView('deck'); };
@@ -1712,7 +1746,7 @@ function openPause() {
   on('resume', () => closeOv(o)); on('help', () => PANELS.help()); on('settings', () => PANELS.settings());
   on('quit', () => { saveLast(); showHub(); });
   on('abandon', () => confirmBox('Abandon this run?', 'It will not count and cannot be continued.', 'Abandon', () => { P.last = null; M.save(); showHub(); }));
-  on('skiptut', () => { P.tutorialDone = true; P.last = null; M.save(); showHub(); });
+  on('skiptut', () => skipTutorial());
 }
 
 // ---------- end of run ----------
@@ -1730,17 +1764,25 @@ function showEnd() {
     '<p class="muted" style="text-align:center;font-size:13px">' + esc(ctx.label) + ' · ' + esc(founderName(s.founder)) + (s.burn ? ' · Burn ' + s.burn : '') + ' · ' + resultText(s) + ' · ' + s.billsPaid + (s.billsPaid === 1 ? ' bill' : ' bills') + ' paid</p>' +
     '<div style="text-align:center"><div class="lbl">Score (total earned)</div><div class="score num" id="e-score">$0</div><div class="row c" style="margin-top:6px"><span class="chip gold">' + ic('crown') + ' ' + esc(C.rankOf(s.earned)) + '</span>' + (s.earned > prevBest && prevBest > 0 ? '<span class="chip lime">New best!</span>' : '') + (fin.rank === 0 && prevBoard.length ? '<span class="chip lime">#1 on your board</span>' : '') + '</div></div>';
   left += '<div class="row c"><button type="button" class="btn primary" data-a="again">' + ic('play') + (s.mode === 'tutorial' ? ' Continue' : ' Play again') + '</button>' + (s.mode !== 'tutorial' ? '<button type="button" class="btn" data-a="share">' + ic('share') + ' Share</button><button type="button" class="btn" data-a="code">' + ic('copy') + ' Code</button>' : '') + '<button type="button" class="btn ghostb" data-a="hub">' + ic('close') + ' Menu</button></div>';
+  if (s.mode !== 'tutorial' && dailyDone()) left += comebackHTML();
+  let askItch = false;
+  if (s.mode !== 'tutorial' && !P.itchAsk && ((P.runs || 0) >= 3 || ((P.runs || 0) >= 2 && fin.won))) { askItch = true; P.itchAsk = todayYmd(); M.save();
+    left += '<div class="li itchask" id="e-itch">' + ic('star2') + '<span class="grow" style="font-size:13px"><b>Enjoying it?</b> Rate it or leave a comment on itch. It really helps.</span><a class="btn" id="e-itch-go" href="https://secretwall.itch.io/burn-rate" target="_blank" rel="noopener">Rate on itch</a><button type="button" class="ibtn" id="e-itch-x" aria-label="No thanks">' + ic('close') + '</button></div>'; }
   if (g) left += '<div class="li ' + (beat ? 'me' : 'bot') + '">' + ic('ghost') + '<span class="grow" style="font-size:14px">' + (beat ? '<b>You beat BurnBot!</b> It made ' + money(g.total) + ' on this deck.' : 'BurnBot made <b>' + money(g.total) + '</b> on this deck. ' + (s.earned >= g.total * 0.8 ? 'So close.' : 'Next time.')) + '</span></div>';
   if (ctx.challenge) { const cs = ctx.challenge.p.score; left += '<div class="li ' + (s.earned > cs ? 'me' : 'bot') + '">' + ic('trophy') + '<span class="grow" style="font-size:14px">' + (s.earned > cs ? '<b>Challenge beaten!</b> ' : 'Challenge: ') + 'your friend scored ' + money(cs) + '.</span></div>'; }
   if (s.mode !== 'tutorial') left += '<div class="li" id="e-pct">' + ic('chart') + '<span class="grow muted" style="font-size:13px">Simulating 240 players on this deck…</span></div>';
   if (s.mode !== 'tutorial' && fin.xp > 0 && PF.canReward()) left += '<div class="row c"><button type="button" class="btn rewb" data-a="rew">\u{1F3AC} Watch an ad: double XP (+' + fin.xp + ')</button></div>';
-  if (LINKS.tip) left += '<div class="tipline">Enjoying Burn Rate? It\u2019s free. <a href="' + LINKS.tip + '" target="_blank" rel="noopener">' + ic('coffee') + ' Tip the developer</a></div>';
+  if (LINKS.tip && !askItch) left += '<div class="tipline">Enjoying Burn Rate? It\u2019s free. <a href="' + LINKS.tip + '" target="_blank" rel="noopener">' + ic('coffee') + ' Tip the developer</a></div>';
   let right = '<div><div class="row"><b>+' + fin.xp + ' XP</b><span class="muted" style="margin-left:auto;font-size:13px">Level ' + L.lvl + ' · ' + L.into + '/' + L.need + '</span></div><div class="xpbar" style="margin-top:6px"><i id="e-xp" style="width:' + (fin.levelUps.length ? 0 : Math.round(100 * fin.before.into / fin.before.need)) + '%"></i></div><div class="muted" style="font-size:12px;margin-top:4px">' + fin.xpParts.map(x => esc(x[0]) + ' +' + x[1]).join(' · ') + '</div></div>';
   fin.levelUps.forEach(u => { right += '<div class="li me">' + ic('star2') + '<span class="grow"><b>Level ' + u.lvl + '!</b>' + (u.unlocks.length ? '<br><span class="muted" style="font-size:12px">Unlocked: ' + u.unlocks.map(x => esc(x[3])).join(', ') + '</span>' : '') + '</span></div>'; });
   if (fin.newAch.length) right += '<div class="row">' + fin.newAch.map(a => '<span class="chip lime" title="' + esc(a[2]) + '">' + ic('star2') + ' ' + esc(a[1]) + '</span>').join('') + '</div>';
   if (s.mode === 'daily') right += '<div><div class="lbl" style="margin-bottom:4px">Your last 14 Dailies</div><div class="cal">' + calHTML() + '</div></div>';
   const o = openOv('<div class="endgrid"><div class="endcol">' + left + '</div><div class="endcol">' + right + '</div></div>', { close: false, w: 860, cls: 'endsheet' });
   o.dataset.kind = 'end';
+  if ($('e-comeback')) { MX.hit('comeback_shown'); }
+  if (askItch) { MX.hit('itch_prompt_show'); const gone = () => { const e = $('e-itch'); if (e) e.remove(); };
+    $('e-itch-go').onclick = () => { MX.hit('itch_prompt_click'); setTimeout(gone, 300); };
+    $('e-itch-x').onclick = () => { S.play('tap'); MX.hit('itch_prompt_dismiss'); gone(); }; }
   S.play(fin.won ? 'win' : 'unplug', { vol: fin.won ? 1 : 0.5 }); if (fin.won) X.confetti(140);
   X.count($('e-score'), 0, s.earned, 1200, money, () => { if (s.earned > 0) S.play('bigcoin'); });
   setTimeout(() => { const x = $('e-xp'); if (x) x.style.width = Math.round(100 * L.into / L.need) + '%'; if (fin.levelUps.length) S.play('level'); }, 500);
@@ -1830,6 +1872,11 @@ PF.onPause((paused, why) => {
 
 // ---------- tutorial coach + hints ----------
 let coachEl = null, coachTarget = null;
+function skipTutorial() {
+  MX.hit('skip_tutorial');
+  P.tutorialDone = true; P.last = null; M.save(); showHub();
+  toast(ic('book') + ' Tutorial skipped. Replay it any time from How to.', '', 2600);
+}
 function removeCoach() { if (coachEl) { coachEl.remove(); coachEl = null; } if (coachTarget) { coachTarget.classList.remove('spot'); coachTarget = null; } }
 function coachOn(target, text, noSpot) {
   removeCoach(); if (!target) return;

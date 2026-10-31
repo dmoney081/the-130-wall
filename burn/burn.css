@@ -444,3 +444,15 @@ input[type=range]{min-height:50px}
 .port .hub-nav{gap:4px}
 .port .prods.many,.short .prods.many{display:flex}
 .stats .stat{transform-origin:left center}.port .stats .stat{transform-origin:center}
+/* ---------- quick wins: skip tutorial, come-back hook, itch ask ---------- */
+.top .skipblk{flex:none;cursor:pointer;color:var(--muted);font-weight:800;font-size:14px;line-height:1.15;text-align:center;align-items:center;background:transparent;border-style:dashed}
+.top .skipblk:hover{color:var(--ink,#f4f1ea);border-color:var(--muted)}
+.skipline{display:none}
+.port .top .skipblk{display:none}
+.port .center .skipline{display:inline-flex;order:-1;align-self:flex-end;min-height:44px;padding:0 14px;font-size:13px;color:var(--muted);border-style:dashed}
+.cbhub{width:100%;max-width:330px;padding:8px 14px;font-size:12px;display:flex;flex-direction:column;gap:3px}
+.cbhub svg,.comeback .grow svg{width:14px;height:14px;vertical-align:-2px;color:var(--gold)}
+.comeback{border:2px solid rgba(255,196,0,.35)}
+.itchask{border:2px dashed var(--line)}
+.itchask .btn{min-height:52px;padding:0 12px;font-size:14px;white-space:nowrap;color:var(--pink);border-color:var(--pink)}
+.itchask .ibtn{width:52px;height:52px;font-size:16px}
