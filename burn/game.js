@@ -61,6 +61,8 @@ function start(isDaily,isRush){
   $('intro').hidden=true;$('end').hidden=true;$('game').hidden=false;
   log('Day 1. Subscription due in 25 days: <b>$130</b>. You have 100 compute and zero customers. '+(rush?'<b>Rush:</b> 6 seconds per day, or the day passes without you.':'Pick a card.'));
   deal();render();
+  // Short laptop screens: the game frame can be taller than the window, so bring the cards into view after Start.
+  try{$('cards').scrollIntoView({block:'nearest',behavior:'smooth'})}catch(_){}
 }
 function log(h){$('log').innerHTML=h}
 function deal(){
