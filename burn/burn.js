@@ -1110,12 +1110,13 @@ const MX = (function () {
 })();
 // Global daily rank (site build only, Daily only, first finish of today's deck per device). Same anonymous public
 // counters: per deck number, n = finishers and ge<k> = finishers who scored at least E[k]. Read 3 numbers, then add
-// this run (n first, then ge0..ge<k> ascending, 500 ms apart: well inside Abacus' 30 requests / 10 s).
+// this run (n first, then ge0..ge<k> ascending, 400 ms apart: inside Abacus' 30 requests / 10 s).
 const RANK = (function () {
   const real = /\.github\.io$/.test(location.hostname), NS = 'burnrate-secretwall-v2' + (real ? '' : '-test'), base = 'https://abacus.jasoncameron.dev/';
   let on = false;
   try { on = (real || window.BURN_METRICS_FORCE === true) && navigator.doNotTrack !== '1' && navigator.globalPrivacyControl !== true; } catch (_) {}
-  const E = []; for (let k = 0; k <= 20; k++) E.push(Math.round(25 * Math.pow(2, k / 2)));   // $25 … $25,600
+  // $25 … $25,600 in √2 steps, then doubling up to $3,276,800 (long overtime runs score in the millions)
+  const E = []; for (let k = 0; k <= 20; k++) E.push(Math.round(25 * Math.pow(2, k / 2))); for (let k = 21; k <= 27; k++) E.push(E[k - 1] * 2);
   const bucket = v => { let k = -1; for (let j = 0; j < E.length; j++) if (v >= E[j]) k = j; return k; };
   const opt = { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store' };
   function get(key) {
@@ -1123,11 +1124,16 @@ const RANK = (function () {
       const fin = v => { if (done) return; done = true; clearTimeout(t); res(v); }, t = setTimeout(() => { try { if (ac) ac.abort(); } catch (_) {} fin(null); }, 4000);
       try { fetch(base + 'info/' + NS + '/' + key, Object.assign({ signal: ac ? ac.signal : undefined }, opt)).then(r => r.ok ? r.json() : null).then(j => fin(j && typeof j.value === 'number' ? Math.max(0, j.value) : null)).catch(() => fin(null)); } catch (_) { fin(null); } });
   }
-  function hit(key) { try { fetch(base + 'hit/' + NS + '/' + key, opt).catch(() => {}); } catch (_) {} }
+  function hit(key) { try { fetch(base + 'hit/' + NS + '/' + key, Object.assign({ keepalive: true }, opt)).catch(() => {}); } catch (_) {} }
+  // writes go out one every 400 ms (<= 25 per 10 s plus 3 reads); if the tab is hidden or closed first, send the rest at once
+  let q = [], tm = 0;
+  const drain = () => { clearTimeout(tm); tm = 0; while (q.length) hit(q.shift()); };
+  const tick = () => { tm = 0; if (q.length) { hit(q.shift()); if (q.length) tm = setTimeout(tick, 400); } };
+  try { window.addEventListener('pagehide', drain); document.addEventListener('visibilitychange', () => { if (document.hidden) drain(); }); } catch (_) {}
   // others above me ≈ ge_{k+1} + (ge_k − ge_{k+1})·(1 − f), f = log-position of the score inside its bucket
   function estimate(score, n, geK, geK1, k) {
     n = Math.max(0, n || 0); geK = Math.min(n, k < 0 ? n : Math.max(0, geK || 0)); geK1 = Math.min(geK, Math.max(0, geK1 || 0));
-    const lo = k < 0 ? 0 : E[k], hi = k + 1 < E.length ? E[k + 1] : E[E.length - 1] * Math.SQRT2;
+    const lo = k < 0 ? 0 : E[k], hi = k + 1 < E.length ? E[k + 1] : E[E.length - 1] * 2;
     const f = k < 0 ? Math.min(1, score / E[0]) : Math.max(0, Math.min(1, Math.log(Math.max(score, lo) / lo) / Math.log(hi / lo)));
     const above = geK1 + (geK - geK1) * (1 - f), beaten = Math.max(0, n - above);
     return { M: n + 1, n, pct: n ? Math.min(99, Math.round(100 * beaten / n)) : 0 };
@@ -1136,7 +1142,7 @@ const RANK = (function () {
   async function run(deck, score) {
     if (!on) return null; const k = bucket(score), d = 'rank_d' + deck + '_';
     const r = await Promise.all([get(d + 'n'), k >= 0 ? get(d + 'ge' + k) : Promise.resolve(0), k + 1 < E.length ? get(d + 'ge' + (k + 1)) : Promise.resolve(0)]);
-    writes(k).forEach((x, i) => setTimeout(() => hit(d + x), 600 + i * 500));
+    q = q.concat(writes(k).map(x => d + x)); if (!tm) tm = setTimeout(tick, 600);
     if (r.some(v => v === null)) return null;   // could not read: the run is still counted, the screen keeps the simulated line
     return estimate(score, r[0], r[1], r[2], k);
   }
