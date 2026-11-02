@@ -1480,12 +1480,12 @@ function renderAll() { if (!st || !$('game')) return; syncD(); renderTop(); rend
 function billInfo(day) { const cyc = C.cycleOf(day), amt = C.billAmt(st, cyc), due = cyc * C.CYCLE; return { cyc, amt, due, left: due - day }; }
 function renderTop() {
   const day = st.day, b = billInfo(day);
-  $('g-day').textContent = 'Day ' + day + (st.overtime ? '' : ' / 25');
+  $('g-day').textContent = 'Day ' + day + (st.overtime ? '' : st.mode === 'tutorial' ? ' / 5' : ' / ' + C.DAYS);
   $('g-bill').textContent = money(b.amt);
-  $('g-due').textContent = b.left === 0 ? 'due TONIGHT' : layout.port ? 'due in ' + b.left + (b.left === 1 ? ' day' : ' days') : 'due day ' + b.due + ' (' + b.left + (b.left === 1 ? ' day' : ' days') + ')';
+  $('g-due').textContent = b.left === 0 ? 'due TONIGHT' : layout.port ? 'in ' + b.left + (b.left === 1 ? ' day' : ' days') : 'due day ' + b.due + ' (' + b.left + (b.left === 1 ? ' day' : ' days') + ')';
   $('g-billblk').classList.toggle('due', b.left === 0 && st.phase === 'play');
   const bar = $('g-billbar'); bar.firstChild.style.width = Math.min(100, 100 * D.cash / b.amt) + '%'; bar.classList.toggle('short', D.cash < b.amt);
-  $('g-cash').textContent = money(D.cash); $('g-earned').textContent = 'Cash · earned ' + money(D.earned);
+  $('g-cash').textContent = money(D.cash); $('g-earned').textContent = layout.port ? 'Cash' : 'Cash · earned ' + money(D.earned);
   renderGhost();
   S.setIntensity(rush || (b.left === 0 && st.phase === 'play') ? 1 : 0);
 }
@@ -1500,10 +1500,10 @@ function renderGhost() {
 }
 function renderStats() {
   const f = C.forecast(st);
-  $('v-aud').textContent = D.aud; $('k-aud').textContent = 'Audience · ~' + f.visitors + ' visit';
+  $('v-aud').textContent = D.aud; const pt = layout.port; $('k-aud').textContent = (pt ? '~' : 'Audience · ~') + f.visitors + (pt ? ' visits' : ' visit');
   $('v-trust').textContent = D.trust; $('k-trust').textContent = 'Trust · ' + pct(f.conv) + ' buy'; $('m-trust').style.width = D.trust + '%';
-  $('v-q').textContent = D.q; $('k-q').textContent = D.q >= 6 ? 'Quality · Featured' : 'Quality · +$' + (Math.floor(D.q / 3)) + ' price'; $('m-q').style.width = (D.q * 10) + '%';
-  $('v-burn').textContent = D.burnout + '/10'; $('k-burn').textContent = D.burnout >= 6 ? 'Burnout · −1 energy!' : 'Burnout'; $('m-burn').style.width = (D.burnout * 10) + '%';
+  $('v-q').textContent = D.q; $('k-q').textContent = (pt ? '' : 'Quality · ') + (D.q >= 6 ? 'Featured' : '+$' + (Math.floor(D.q / 3)) + ' price'); $('m-q').style.width = (D.q * 10) + '%';
+  $('v-burn').textContent = D.burnout + '/10'; $('k-burn').textContent = D.burnout >= 6 ? (pt ? '−1 energy!' : 'Burnout · −1 energy!') : 'Burnout'; $('m-burn').style.width = (D.burnout * 10) + '%';
   $('s-burn').classList.toggle('hot', D.burnout >= 6);
 }
 function renderBiz(newUid) {
@@ -1514,11 +1514,12 @@ function renderBiz(newUid) {
   for (let i = st.tools.length; i < C.MAX_TOOLS; i++) h += '<span class="toolb emptyt" aria-hidden="true"></span>';
   t.innerHTML = h; t.classList.toggle('many', st.tools.length > 2); t.classList.toggle('none', !st.tools.length);
 }
+const xsF = x => (Math.round(x * 100) / 100) + '';
 function renderFc() {
   const f = C.forecast(st), el = $('g-fc');
   if (!st.products.length) { el.innerHTML = '<div class="fc-row">' + ic('prod') + ' <b>No products yet.</b> Ship one to start selling.</div>'; return; }
   const est = Math.round(f.perDay);
-  el.innerHTML = '<div class="fc-row"><span>Tonight</span><b>' + f.visitors + '</b>' + ic('aud') + '<span class="arrow">×</span><b>' + pct(f.conv) + '</b><span class="arrow">→</span><b>' + (Math.round(f.buyers * 10) / 10) + '</b><span>buyers</span><span class="arrow">≈</span><b style="color:var(--gold)">' + money(est) + '</b></div>' +
+  el.innerHTML = '<div class="fc-row"><span>Tonight</span><b>' + f.visitors + '</b>' + ic('aud') + '<span class="arrow">×</span><b>' + pct(f.conv) + '</b>' + (f.xsell > 1 ? '<span class="arrow">×</span><b title="Cross-sell: each extra product adds 25% more buyers">' + xsF(f.xsell) + '</b>' + ic('prod') : '') + '<span class="arrow">→</span><b>' + (Math.round(f.buyers * 10) / 10) + '</b><span>buyers</span><span class="arrow">≈</span><b style="color:var(--gold)">' + money(est) + '</b></div>' +
     '<div class="fc-next"><span>Next buyer</span><div class="meter"><i style="width:' + Math.round(f.nextBuyer * 100) + '%"></i></div>' + (f.mult < 1 ? '<span style="color:var(--red)">sales ×' + f.mult + '</span>' : '') + '</div>';
 }
 function renderCpu() {
@@ -1670,7 +1671,7 @@ async function playEvents(E) {
       case 'discard': if (!discarded) { discarded = true; const h = $('g-hand'); if (h && motionOK) h.classList.add('discarding'); S.play('whoosh'); await wait(260); } break;
       case 'funnel': {
         $('game').classList.add('night'); S.play('night');
-        say(ic('aud') + ' Night falls. <b>' + e.visitors + '</b> visitors × ' + pct(e.conv) + ' → <b>' + e.buyers + '</b> ' + (e.buyers === 1 ? 'buyer' : 'buyers') + (st.products.length ? '' : ' (no products to buy!)'), e.buyers ? 'good' : 'say');
+        say(ic('aud') + ' Night falls. <b>' + e.visitors + '</b> visitors × ' + pct(e.conv) + (st.products.length > 1 ? ' × ' + xsF(1 + C.T.XSELL * (st.products.length - 1)) + ' (' + st.products.length + ' products)' : '') + ' → <b>' + e.buyers + '</b> ' + (e.buyers === 1 ? 'buyer' : 'buyers') + (st.products.length ? '' : ' (no products to buy!)'), e.buyers ? 'good' : 'say');
         X.pulse($('g-fc')); await wait(e.buyers ? 520 : 700); break;
       }
       case 'sale': {
@@ -1723,7 +1724,8 @@ function showOffers() {
   if (ov && ov.dataset.kind === 'offers') closeOv(ov);
   const reward = st.phase === 'reward', s = st;
   const title = reward ? (s.overtime && s.billsPaid > 5 ? 'Overtime bill paid! Pick an upgrade' : 'Bill paid! Pick an upgrade') : 'Mid-cycle draft: add a card';
-  const sub = reward ? 'Take a card or a tool, or remove a card to thin your deck.' : 'Pick one card for your deck, or skip to keep it lean.';
+  const tutPick = st.mode === 'tutorial' && !reward && st.day <= 3;
+  const sub = tutPick ? '<span class="coach-in">New cards make your deck stronger. Pick one you like.</span>' : reward ? 'Take a card or a tool, or remove a card to thin your deck.' : 'Pick one card for your deck, or skip to keep it lean.';
   const o = openOv('<h2>' + esc(title) + '</h2><p class="muted" style="font-size:14px">' + sub + '</p><div class="offers">' + s.offers.map((x, i) => '<div class="offer">' + (x.k === 'card' ? cardHTML(x.id, { big: 1, attr: ' data-pick="' + i + '"' }) : toolHTML(x.id, { attr: ' data-pick="' + i + '"' })) + '<span class="muted" style="font-size:12px">' + (i + 1) + '</span></div>').join('') + '</div>' +
     '<div class="row c">' + (s.rerolls > 0 ? '<button type="button" class="btn" data-a="reroll">' + ic('reroll') + ' Reroll (R)</button>' : '') + (reward ? '<button type="button" class="btn" data-a="remove">' + ic('trash') + ' Remove a card</button>' : '') + '<button type="button" class="btn ghostb" data-a="skip">Skip (S)</button></div>', { close: false, w: 640 });
   o.dataset.kind = 'offers';
@@ -1731,7 +1733,6 @@ function showOffers() {
   const ab = o.querySelector('[data-a=reroll]'); if (ab) ab.onclick = () => { S.play('whoosh'); closeOv(o); doAct({ t: 'reroll' }); };
   o.querySelector('[data-a=skip]').onclick = () => { S.play('tap'); closeOv(o); doAct({ t: 'skip' }); };
   const rb = o.querySelector('[data-a=remove]'); if (rb) rb.onclick = () => { S.play('tap'); removePicker(); };
-  if (st.mode === 'tutorial' && !reward && st.day <= 3) coachOn(o.querySelector('.offers'), 'New cards make your deck stronger. Pick one you like.', true);
 }
 function removePicker() {
   const all = C.allCards(st);
@@ -1926,7 +1927,7 @@ function coachUpdate() {
       return coachOn($('g-end'), (st.hand.some((c, i) => C.canPlay(st, i)) ? 'Done for today? ' : 'Out of moves. ') + 'End the day: tonight visitors arrive and some of them buy.');
     }
     if (st.day === 2 && !played.length) return coachOn($('g-billblk'), 'Every 5 days the <b>power bill</b> is due. Have the cash at the end of day 5, or you get unplugged.', true);
-    if (st.day === 3 && !played.length) return coachOn($('g-fc'), 'Your forecast: visitors × buy rate → buyers. More audience and trust means more sales.', true);
+    if (st.day === 3 && !played.length) return coachOn($('g-fc'), 'Your forecast: visitors × buy rate → buyers. More audience, more trust and more products mean more sales.', true);
     if (st.day === 4 && !played.length) return coachOn($('s-trust'), 'Trust sets your buy rate. Reply to comments and help people to raise it.', true);
     if (st.day === 5 && !played.length) return coachOn($('g-billblk'), 'Bill day! Cover it tonight and the tutorial is done.', true);
     return;
