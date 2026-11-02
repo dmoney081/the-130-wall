@@ -417,6 +417,7 @@ function endDay(s, E) {
     if (s.cash >= amt) {
       s.cash -= amt; s.billsPaid++;
       E.push({ t: 'bill', paid: 1, amt: amt, cyc: cyc, left: s.cash });
+      if (s.mode === 'tutorial') { s.phase = 'over'; s.result = 'graduated'; E.push({ t: 'over', result: 'graduated' }); return; }   // tutorial = first 5 days only
       if (s.day === DAYS && !s.overtime) { s.phase = 'won'; E.push({ t: 'won' }); return; }
       if (s.day >= MAX_DAY) { s.phase = 'over'; s.result = 'ipo'; E.push({ t: 'over', result: 'ipo' }); return; }
       s.day++; openReward(s, E); return;
@@ -1026,6 +1027,9 @@ function streak() {
   while (P.daily[d]) { n++; d = addDays(d, -1); }
   return n;
 }
+// streak XP ladder for the first Daily of each day: day 2..6 build up, every 7th day pays more than days 2-6 together
+const LADDER = [20, 20, 30, 40, 50, 60, 250];
+function streakBonus(n) { return n > 1 ? LADDER[(n - 1) % 7] : 0; }
 // ---- leaderboard ----
 function boardFor(mode, day) { if (mode === 'daily') return (P.board.daily[day || ymd()] = P.board.daily[day || ymd()] || []); return P.board[mode] || (P.board[mode] = []); }
 function addBoard(mode, e, day) { const b = boardFor(mode, day); b.push(e); b.sort((x, y) => y.score - x.score); b.splice(10); return b.indexOf(e); }
@@ -1046,7 +1050,7 @@ function finish(s, extra) {
   const before = levelOf(P.xp);
   const xp = [['Run', 10], ['Revenue', Math.floor(s.earned / 25)], ['Bills paid', 15 * s.billsPaid]];
   if (won) xp.push(['Win', 50]); if (won && s.burn) xp.push(['Burn ' + s.burn, 10 * s.burn]);
-  if (first) xp.push(['First Daily today', 40]); if (extra.beatGhost) xp.push(['Beat BurnBot', 20]);
+  if (first) { xp.push(['First Daily today', 40]); const k = streak(), sb = streakBonus(k); if (sb) xp.push(['Streak day ' + k, sb]); } if (extra.beatGhost) xp.push(['Beat BurnBot', 20]);
   const r = { s, won, streak: streak(), beatGhost: !!extra.beatGhost };
   A.forEach(a => { if (!P.ach[a[0]] && a[3](r)) { P.ach[a[0]] = day; out.newAch.push(a); xp.push([a[1], 25]); } });
   let tot = 0; xp.forEach(x => tot += x[1]); P.xp += tot; out.xpParts = xp; out.xp = tot;
@@ -1059,7 +1063,7 @@ function finish(s, extra) {
   P.last = null; save();
   return out;
 }
-window.BurnMeta = { load, save, grantXp, get P() { return P; }, ymd, addDays, deckNo, level, levelOf, cardLvl, need, nextUnlock, unlocksAt, UNLOCKS, DESKS, SKINS, owns, founderOpen, ACH: A, collection, streak, boardFor, finish, reset() { const keep = P.set; P = DEFAULT(); P.set = keep; P.tutorialDone = true; save(); } };
+window.BurnMeta = { load, save, grantXp, get P() { return P; }, ymd, addDays, deckNo, streakBonus, level, levelOf, cardLvl, need, nextUnlock, unlocksAt, UNLOCKS, DESKS, SKINS, owns, founderOpen, ACH: A, collection, streak, boardFor, finish, reset() { const keep = P.set; P = DEFAULT(); P.set = keep; P.tutorialDone = true; save(); } };
 })();
 
 /* ---- js/ui.js ---- */
@@ -1217,7 +1221,7 @@ function hubHTML() {
   h += '<div class="hub-r">';
   if (challenge) h += '<button type="button" class="mode challenge" data-go="challenge"><span class="mi">' + ic('trophy') + '</span><span><span class="mt">Beat ' + money(challenge.p.score) + '</span><br><span class="ms">A friend\u2019s ' + esc(modeLabel({ mode: challenge.p.mode, seedDay: challenge.day })) + ' run. Same deck, same luck.</span></span><span class="go">PLAY</span></button>';
   if (P.last && P.last.ctx) h += '<button type="button" class="mode cont" data-go="continue"><span class="mi">' + ic('play') + '</span><span><span class="mt">Continue</span><br><span class="ms">' + esc(P.last.ctx.label || 'Your run') + ' · day ' + (P.last.day || '?') + '</span></span><span class="go">RESUME</span></button>';
-  h += '<button type="button" class="mode daily" data-go="daily"><span class="mi">' + ic('cal') + '</span><span><span class="mt">Daily #' + dailyNo() + '</span><br><span class="ms">' + (dd && !dd.v1 ? 'Done: ' + money(dd.score) + (dd.won ? ' · won' : '') + '. Next deck in <span class="cd-next">' + leftText(msToNextDaily()) + '</span>.' : 'Same deck for everyone today.' + (stk ? ' Keep your ' + stk + '-day streak.' : '')) + '</span></span><span class="go">' + (dd && !dd.v1 ? 'REPLAY' : 'PLAY') + '</span></button>';
+  h += '<button type="button" class="mode daily" data-go="daily"><span class="mi">' + ic('cal') + '</span><span><span class="mt">Daily #' + dailyNo() + '</span><br><span class="ms">' + (dd && !dd.v1 ? 'Done: ' + money(dd.score) + (dd.won ? ' · won' : '') + '. Next deck in <span class="cd-next">' + leftText(msToNextDaily()) + '</span>.' : 'Same deck for everyone today.' + (stk ? ' Keep your ' + stk + '-day streak: +' + M.streakBonus(stk + 1) + ' XP.' : '')) + '</span></span><span class="go">' + (dd && !dd.v1 ? 'REPLAY' : 'PLAY') + '</span></button>';
   h += '<button type="button" class="mode run" data-go="run"><span class="mi">' + ic('rocket') + '</span><span><span class="mt">Run</span><br><span class="ms">Pick a founder and a Burn level. New deck each time.</span></span><span class="go">SET UP</span></button>';
   h += '<button type="button" class="mode rush" data-go="rush"><span class="mi">' + ic('clock') + '</span><span><span class="mt">Rush</span><br><span class="ms">20 seconds a day. Think fast.</span></span><span class="go">GO</span></button>';
   h += '<div class="hub-nav">' + [['board', 'trophy', 'Board'], ['cards', 'card', 'Cards'], ['awards', 'star2', 'Awards'], ['desk', 'crown', 'Desk'], ['codes', 'tag', 'Codes'], ['help', 'book', 'How to'], ['settings', 'gear', 'Settings']].map(b => '<button type="button" class="btn" data-nav="' + b[0] + '" aria-label="' + b[2] + '">' + ic(b[1]) + '<span class="hl">' + b[2] + '</span></button>').join('') + '</div>';
@@ -1323,7 +1327,7 @@ function showHubBind() {
   view.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { S.play('tap'); const g = b.dataset.go; if (g === 'daily') startDaily(); else if (g === 'run') runSetup(); else if (g === 'rush') startRush(); else if (g === 'continue') continueRun(); else if (g === 'challenge') startChallenge(); });
   view.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => { S.play('tap'); PANELS[b.dataset.nav](); });
 }
-function resultText(s) { return s.result === 'won' ? 'won on day 25' : s.result === 'ipo' ? 'IPO on day 50' : s.result === 'overtime' ? 'all bills paid, overtime ended on day ' + s.day : s.result === 'unplugged' ? 'unplugged on day ' + s.day : 'day ' + s.day; }
+function resultText(s) { return s.result === 'graduated' ? 'done on day 5' : s.result === 'won' ? 'won on day 25' : s.result === 'ipo' ? 'IPO on day 50' : s.result === 'overtime' ? 'all bills paid, overtime ended on day ' + s.day : s.result === 'unplugged' ? 'unplugged on day ' + s.day : 'day ' + s.day; }
 function dayOfSeed(seed) { for (let i = 0; i < 60; i++) { const d = M.addDays(todayYmd(), -i); if (C.dailySeed(d) === seed) return d; } return null; }
 
 // ---------- starting runs ----------
@@ -1351,8 +1355,9 @@ function teaseFor(day) { // the best card in that deck's first draft (offers are
 function dailyDone(d) { const r = P.daily[d || todayYmd()]; return !!(r && !r.v1); }
 function streakLine() {
   const stk = M.streak();
-  if (dailyDone()) return ic('flame2') + ' <b>' + stk + '-day Daily streak.</b> Play tomorrow to make it ' + (stk + 1) + '.';
-  return stk ? ic('flame2') + ' <b>' + stk + '-day Daily streak.</b> Play today\u2019s Daily to keep it.' : 'Play the Daily each day to build a streak.';
+  const xp = n => ' <span class="sbonus">+' + M.streakBonus(n) + ' XP</span>';
+  if (dailyDone()) return ic('flame2') + ' <b>' + stk + '-day Daily streak.</b> Play tomorrow for day ' + (stk + 1) + ':' + xp(stk + 1) + ((stk + 1) % 7 ? '' : ' (big week bonus!)') + '.';
+  return stk ? ic('flame2') + ' <b>' + stk + '-day Daily streak.</b> Play today\u2019s Daily for day ' + (stk + 1) + ':' + xp(stk + 1) + '.' : ic('flame2') + ' Play the Daily each day to build a streak. Day 7 pays' + xp(7) + '.';
 }
 function teaseLine() { const t = teaseFor(M.addDays(todayYmd(), 1)); return t ? 'Tomorrow\u2019s first draft: <b>' + esc(t.n) + '</b>' + (t.rar ? ' (' + (t.rar > 1 ? 'rare' : 'uncommon') + ')' : '') + '.' : ''; }
 function comebackHTML() { // end screen, once today's Daily is done
@@ -1387,7 +1392,7 @@ function begin(opts, c, actions) {
   PF.adBreak(kind, go);
 }
 function openingLine() {
-  if (st.mode === 'tutorial') return 'Hi! I\u2019m a tiny bot with a tiny startup. Let\u2019s keep the lights on.';
+  if (st.mode === 'tutorial') return 'Hi! I\u2019m a tiny bot with a tiny startup. Pay the first power bill on day 5 and you\u2019re ready.';
   if (st.day > 1) return 'Welcome back. Day ' + st.day + '.';
   if (st.mode === 'rush') return '20 seconds a day. Go go go!';
   if (ctx.challenge) return 'Beat ' + money(ctx.challenge.p.score) + ' on this deck.';
@@ -1553,7 +1558,7 @@ function renderHand() {
 function renderMood(m) {
   const bot = $('g-bot'); if (!bot) return;
   if (!m) { const b = billInfo(st.day); const f = C.forecast(st);
-    m = st.phase === 'over' ? (st.billsPaid >= 5 ? 'happy' : 'sad') : D.burnout >= 6 ? 'sleepy' : b.left <= 1 && D.cash + f.perDay * (b.left + 1) < b.amt ? 'worried' : 'idle'; }
+    m = st.phase === 'over' ? (st.billsPaid >= 5 || st.result === 'graduated' ? 'happy' : 'sad') : D.burnout >= 6 ? 'sleepy' : b.left <= 1 && D.cash + f.perDay * (b.left + 1) < b.amt ? 'worried' : 'idle'; }
   if (bot.dataset.mood === m) return; bot.dataset.mood = m;
   bot.innerHTML = A.bot(m, M.owns('skin', P.cos.skin) ? P.cos.skin : 'classic');
 }
@@ -1699,6 +1704,7 @@ async function playEvents(E) {
       case 'day': {
         $('game').classList.remove('night');
         D.cpu = e.cpu; D.cpuMax = e.cpu; D.day = e.day;
+        if (st.mode === 'tutorial' && e.day > 1 && e.day <= 5) MX.hit('tut_day' + e.day);
         const b = billInfo(e.day);
         if (e.day > 1) { renderTop(); renderCpu(); if (b.left === 0) { say(ic('cash') + ' <b>Bill day!</b> You need ' + money(b.amt) + ' by tonight. You have ' + money(D.cash) + '.', D.cash >= b.amt ? 'good' : 'bad'); S.play('tick'); } else if (!fast) S.play('tick', { vol: 0.4 }); }
         await wait(160); break;
@@ -1758,13 +1764,14 @@ function showEnd() {
   const fin = M.finish(s, { seedDay: ctx.seedDay, code, beatGhost: beat });
   if (fin.won) PF.hook('happy');
   MX.hit('end_' + (s.mode || 'run') + (s.result === 'unplugged' ? '_lost' : '_won'));
-  const stamp = s.result === 'won' ? ['st-win', 'RETIRED A WINNER'] : s.result === 'ipo' ? ['st-ipo', 'IPO!'] : s.result === 'overtime' ? ['st-win', 'ALL BILLS PAID!'] : ['st-lose', 'UNPLUGGED'];
+  const stamp = s.result === 'graduated' ? ['st-win', 'TUTORIAL DONE!'] : s.result === 'won' ? ['st-win', 'RETIRED A WINNER'] : s.result === 'ipo' ? ['st-ipo', 'IPO!'] : s.result === 'overtime' ? ['st-win', 'ALL BILLS PAID!'] : ['st-lose', 'UNPLUGGED'];
   const L = fin.after;
   let left = '<div style="text-align:center"><div class="stamp in ' + stamp[0] + '">' + stamp[1] + '</div></div>' +
     '<p class="muted" style="text-align:center;font-size:13px">' + esc(ctx.label) + ' · ' + esc(founderName(s.founder)) + (s.burn ? ' · Burn ' + s.burn : '') + ' · ' + resultText(s) + ' · ' + s.billsPaid + (s.billsPaid === 1 ? ' bill' : ' bills') + ' paid</p>' +
     '<div style="text-align:center"><div class="lbl">Score (total earned)</div><div class="score num" id="e-score">$0</div><div class="row c" style="margin-top:6px"><span class="chip gold">' + ic('crown') + ' ' + esc(C.rankOf(s.earned)) + '</span>' + (s.earned > prevBest && prevBest > 0 ? '<span class="chip lime">New best!</span>' : '') + (fin.rank === 0 && prevBoard.length ? '<span class="chip lime">#1 on your board</span>' : '') + '</div></div>';
-  left += '<div class="row c"><button type="button" class="btn primary" data-a="again">' + ic('play') + (s.mode === 'tutorial' ? ' Continue' : ' Play again') + '</button>' + (s.mode !== 'tutorial' ? '<button type="button" class="btn" data-a="share">' + ic('share') + ' Share</button><button type="button" class="btn" data-a="code">' + ic('copy') + ' Code</button>' : '') + '<button type="button" class="btn ghostb" data-a="hub">' + ic('close') + ' Menu</button></div>';
+  left += '<div class="row c"><button type="button" class="btn primary" data-a="again">' + ic('play') + (s.mode === 'tutorial' ? (dailyDone() ? ' Start a run' : ' Play Daily #' + dailyNo()) : ' Play again') + '</button>' + (s.mode !== 'tutorial' ? '<button type="button" class="btn" data-a="share">' + ic('share') + ' Share</button><button type="button" class="btn" data-a="code">' + ic('copy') + ' Code</button>' : '') + '<button type="button" class="btn ghostb" data-a="hub">' + ic('close') + ' Menu</button></div>';
   if (s.mode !== 'tutorial' && dailyDone()) left += comebackHTML();
+  if (s.mode === 'tutorial') left += '<div class="li me" id="e-next">' + ic('cal') + '<span class="grow" style="font-size:14px">' + (s.result === 'graduated' ? '<b>You\u2019re ready.</b> ' : '<b>Close one!</b> ') + (dailyDone() ? 'A full run is 25 days and five bills. Unlock new founders, desks and robot skins as you level up.' : '<b>Daily #' + dailyNo() + '</b> is the same deck for everyone today. Beat BurnBot\u2019s score and start a streak: a new deck every day, and day 7 pays <span class="sbonus">+' + M.streakBonus(7) + ' XP</span>.') + '</span></div>';
   let askItch = false;
   if (s.mode !== 'tutorial' && !P.itchAsk && ((P.runs || 0) >= 3 || ((P.runs || 0) >= 2 && fin.won))) { askItch = true; P.itchAsk = todayYmd(); M.save();
     left += '<div class="li itchask" id="e-itch">' + ic('star2') + '<span class="grow" style="font-size:13px"><b>Enjoying it?</b> Rate it or leave a comment on itch. It really helps.</span><a class="btn" id="e-itch-go" href="https://secretwall.itch.io/burn-rate" target="_blank" rel="noopener">Rate on itch</a><button type="button" class="ibtn" id="e-itch-x" aria-label="No thanks">' + ic('close') + '</button></div>'; }
@@ -1772,7 +1779,7 @@ function showEnd() {
   if (ctx.challenge) { const cs = ctx.challenge.p.score; left += '<div class="li ' + (s.earned > cs ? 'me' : 'bot') + '">' + ic('trophy') + '<span class="grow" style="font-size:14px">' + (s.earned > cs ? '<b>Challenge beaten!</b> ' : 'Challenge: ') + 'your friend scored ' + money(cs) + '.</span></div>'; }
   if (s.mode !== 'tutorial') left += '<div class="li" id="e-pct">' + ic('chart') + '<span class="grow muted" style="font-size:13px">Simulating 240 players on this deck…</span></div>';
   if (s.mode !== 'tutorial' && fin.xp > 0 && PF.canReward()) left += '<div class="row c"><button type="button" class="btn rewb" data-a="rew">\u{1F3AC} Watch an ad: double XP (+' + fin.xp + ')</button></div>';
-  if (LINKS.tip && !askItch) left += '<div class="tipline">Enjoying Burn Rate? It\u2019s free. <a href="' + LINKS.tip + '" target="_blank" rel="noopener">' + ic('coffee') + ' Tip the developer</a></div>';
+  if (LINKS.tip && !askItch && s.mode !== 'tutorial') left += '<div class="tipline">Enjoying Burn Rate? It\u2019s free. <a href="' + LINKS.tip + '" target="_blank" rel="noopener">' + ic('coffee') + ' Tip the developer</a></div>';
   let right = '<div><div class="row"><b>+' + fin.xp + ' XP</b><span class="muted" style="margin-left:auto;font-size:13px">Level ' + L.lvl + ' · ' + L.into + '/' + L.need + '</span></div><div class="xpbar" style="margin-top:6px"><i id="e-xp" style="width:' + (fin.levelUps.length ? 0 : Math.round(100 * fin.before.into / fin.before.need)) + '%"></i></div><div class="muted" style="font-size:12px;margin-top:4px">' + fin.xpParts.map(x => esc(x[0]) + ' +' + x[1]).join(' · ') + '</div></div>';
   fin.levelUps.forEach(u => { right += '<div class="li me">' + ic('star2') + '<span class="grow"><b>Level ' + u.lvl + '!</b>' + (u.unlocks.length ? '<br><span class="muted" style="font-size:12px">Unlocked: ' + u.unlocks.map(x => esc(x[3])).join(', ') + '</span>' : '') + '</span></div>'; });
   if (fin.newAch.length) right += '<div class="row">' + fin.newAch.map(a => '<span class="chip lime" title="' + esc(a[2]) + '">' + ic('star2') + ' ' + esc(a[1]) + '</span>').join('') + '</div>';
@@ -1788,7 +1795,7 @@ function showEnd() {
   setTimeout(() => { const x = $('e-xp'); if (x) x.style.width = Math.round(100 * L.into / L.need) + '%'; if (fin.levelUps.length) S.play('level'); }, 500);
   if (fin.newAch.length) setTimeout(() => S.play('combo'), 900);
   const on = (a, f) => { const b = o.querySelector('[data-a=' + a + ']'); if (b) b.onclick = () => { S.play('tap'); f(b); }; };
-  on('again', () => { const m = ctx.mode, op = ctx.opts; if (m === 'daily') startDaily(); else if (m === 'rush') startRush(); else if (m === 'tutorial') showHub(); else if (ctx.challenge) startChallenge(); else startRun(op.founder, op.burn); });
+  on('again', () => { const m = ctx.mode, op = ctx.opts; if (m === 'daily') startDaily(); else if (m === 'rush') startRush(); else if (m === 'tutorial') { if (dailyDone()) startRun('tiny', 0); else startDaily(); } else if (ctx.challenge) startChallenge(); else startRun(op.founder, op.burn); });
   on('share', () => shareRun(s, code));
   on('code', () => copyAndSay(code, 'Code copied!'));
   on('hub', () => showHub());
@@ -1921,7 +1928,7 @@ function coachUpdate() {
     if (st.day === 2 && !played.length) return coachOn($('g-billblk'), 'Every 5 days the <b>power bill</b> is due. Have the cash at the end of day 5, or you get unplugged.', true);
     if (st.day === 3 && !played.length) return coachOn($('g-fc'), 'Your forecast: visitors × buy rate → buyers. More audience and trust means more sales.', true);
     if (st.day === 4 && !played.length) return coachOn($('s-trust'), 'Trust sets your buy rate. Reply to comments and help people to raise it.', true);
-    if (st.day === 5 && !played.length) return coachOn($('g-billblk'), 'Bill day! Sell enough by tonight to cover it.', true);
+    if (st.day === 5 && !played.length) return coachOn($('g-billblk'), 'Bill day! Cover it tonight and the tutorial is done.', true);
     return;
   }
   if (!P.set.hints) return;

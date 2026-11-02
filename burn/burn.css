@@ -456,3 +456,4 @@ input[type=range]{min-height:50px}
 .itchask{border:2px dashed var(--line)}
 .itchask .btn{min-height:52px;padding:0 12px;font-size:14px;white-space:nowrap;color:var(--pink);border-color:var(--pink)}
 .itchask .ibtn{width:52px;height:52px;font-size:16px}
+.sbonus{color:var(--lime,#c6ff3d);font-weight:800;white-space:nowrap}
