@@ -68,7 +68,7 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const FULL = 35; // lvl value meaning "every card unlocked" (Daily, Rush and codes from maxed profiles)
 const DAYS = 25, CYCLE = 5, MAX_DAY = 50, MAX_PRODUCTS = 6, MAX_TOOLS = 5, MAX_HAND = 8;
 // balance knobs (tuned with sim/sim.js)
-const T = { VIS: 0.25, CONV0: 0.01, CONVT: 0.0016, XSELL: 0.25, QDIV: 3, QCAP: 10, WOM: 0.3, DECAY: 0.9, PRICECAP: 5, OT: 2, BILLS: [15, 90, 330, 920, 2100], TUT: 0.8 };
+const T = { VIS: 0.25, CONV0: 0.01, CONVT: 0.0016, XSELL: 0.25, QDIV: 3, QCAP: 10, WOM: 0.3, DECAY: 0.9, PRICECAP: 5, OT: 2, BILLS: [15, 90, 330, 920, 2100], TUT: 0.8, TUTDAYS: 3, TUTBILL: 24, TUTFANS: 5 };
 const BILLS = T.BILLS;
 const TAGS = { build: 'BUILD', grow: 'GROW', trust: 'TRUST', rest: 'REST', shady: 'SHADY', curse: 'CURSE' };
 
@@ -261,11 +261,14 @@ function canPlay(s, i) {
   return true;
 }
 function billAmt(s, cyc) {
+  if (s.mode === 'tutorial') return T.TUTBILL;   // tutorial: one fixed bill, due at the end of day TUTDAYS
   let b = cyc <= 5 ? T.BILLS[cyc - 1] : Math.round(T.BILLS[4] * Math.pow(T.OT, cyc - 5));
   let m = s.mode === 'tutorial' ? T.TUT : 1; if (burnHas(s, 1)) m += .1; if (burnHas(s, 5)) m += .1; if (burnHas(s, 9)) m += .15;
   return Math.round(b * m);
 }
 function cycleOf(day) { return Math.ceil(day / CYCLE); }
+// the day the current bill is due (tutorial: day TUTDAYS; everything else: every CYCLE days)
+function billDue(s, day) { return s.mode === 'tutorial' ? T.TUTDAYS : cycleOf(day) * CYCLE; }
 function conv(s) { return clamp(T.CONV0 + s.trust * T.CONVT + s.convBonus + (hasTool(s, 'analytics') ? 0.03 : 0), 0.01, 0.45); }
 function checkoutBroken(s) { const f = c => c.id === 'checkout'; return s.hand.some(f) || s.deck.some(f) || s.discard.some(f); }
 function forecast(s) {
@@ -376,9 +379,11 @@ function endDay(s, E) {
   // the sales cascade
   const f = forecast(s);
   s.pipe += f.buyers;
+  // tutorial only: launch-day fans make the very first night loud (daily/run/rush never get this)
+  let fans = 0; if (s.mode === 'tutorial' && s.day === 1 && s.products.length) { fans = T.TUTFANS; s.pipe += fans; }
   let buyers = Math.floor(s.pipe + 1e-9); s.pipe = Math.max(0, s.pipe - buyers);
   let mult = f.mult * t.salesMult;
-  E.push({ t: 'funnel', aud: s.aud, visitors: f.visitors, conv: f.conv, buyers: buyers });
+  E.push({ t: 'funnel', aud: s.aud, visitors: f.visitors, conv: f.conv, buyers: buyers, fans: fans, xsell: f.xsell, nP: s.products.length, mult: mult });
   let rev = 0;
   if (s.products.length && buyers > 0) {
     // buyers spread round-robin over your products (rotating start), each pays that product's price
@@ -412,12 +417,12 @@ function endDay(s, E) {
   s.days.push({ rev: t.rev, aud: s.aud, cash: s.cash });
   s.stats.bestDay = Math.max(s.stats.bestDay, t.rev);
   // bill
-  if (s.day % CYCLE === 0) {
+  if (s.mode === 'tutorial' ? s.day === T.TUTDAYS : s.day % CYCLE === 0) {
     const cyc = cycleOf(s.day), amt = billAmt(s, cyc);
     if (s.cash >= amt) {
       s.cash -= amt; s.billsPaid++;
       E.push({ t: 'bill', paid: 1, amt: amt, cyc: cyc, left: s.cash });
-      if (s.mode === 'tutorial') { s.phase = 'over'; s.result = 'graduated'; E.push({ t: 'over', result: 'graduated' }); return; }   // tutorial = first 5 days only
+      if (s.mode === 'tutorial') { s.phase = 'over'; s.result = 'graduated'; E.push({ t: 'over', result: 'graduated' }); return; }   // tutorial = first TUTDAYS days only
       if (s.day === DAYS && !s.overtime) { s.phase = 'won'; E.push({ t: 'won' }); return; }
       if (s.day >= MAX_DAY) { s.phase = 'over'; s.result = 'ipo'; E.push({ t: 'over', result: 'ipo' }); return; }
       s.day++; openReward(s, E); return;
@@ -522,7 +527,7 @@ function dailySeed(ymd) { return hash('burnrate2-daily-' + ymd); }
 
 const Core = {
   T, FULL, DAYS, CYCLE, MAX_DAY, MAX_TOOLS, BILLS, TAGS, CARDS, TOOLS, FOUNDERS, BURNS, EVENTS, STARTER, RANKS,
-  hash, stream, newRun, act, legal, canPlay, costOf, whyNot, priceOf, forecast, conv, billAmt, cycleOf, allCards, checkoutBroken,
+  hash, stream, newRun, act, legal, canPlay, costOf, whyNot, priceOf, forecast, conv, billAmt, cycleOf, billDue, allCards, checkoutBroken,
   encodeAction, decodeAction, b64, unb64, code, parseCode, replay, verify, rankOf, dailySeed,
   clone: s => JSON.parse(JSON.stringify(s)),
   describe(s, id) { const d = CARDS[id]; return d.dyn && s ? d.dyn(s) : d.fx; },
@@ -639,6 +644,7 @@ const P = {
   close: '<path d="M6 6l12 12M18 6L6 18"/>',
   lock: '<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
   check: '<path d="M4.5 12.5l5 5 10-11"/>',
+  hand: '<path d="M10 13V5a1.6 1.6 0 0 1 3.2 0v6M13.2 10.5a1.6 1.6 0 0 1 3.2 0v1.5M16.4 11.2a1.6 1.6 0 0 1 3.1.3V15c0 3.6-2.4 6.5-6 6.5h-1c-2.2 0-3.6-1.1-4.8-2.9L5 14.2a1.6 1.6 0 0 1 2.6-1.8L10 15"/>',
   ghost: '<path d="M5 20V11a7 7 0 0 1 14 0v9l-2.3-1.6L14.3 20 12 18.4 9.7 20l-2.4-1.6z"/><circle cx="9.5" cy="11" r="1"/><circle cx="14.5" cy="11" r="1"/>',
   tool: '<path d="M9 3v5M15 3v5M6.5 8h11v3a5.5 5.5 0 0 1-11 0zM12 16.5V21"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3.5 2"/>',
@@ -1119,8 +1125,8 @@ let layout = { port: false, W: 960, H: 540, k: 1 };
 let busy = false, fast = false, pending = null, selected = -1, ov = null, ovStack = [], shownUids = {}, D = {};
 let rush = null;            // {left, per}
 let motionOK = true;
-let touchMode = false;
-window.addEventListener('pointerdown', e => { touchMode = e.pointerType === 'touch' || e.pointerType === 'pen'; }, true);
+let touchMode = (() => { try { return matchMedia('(pointer: coarse)').matches; } catch (_) { return false; } })();   // phones say "Tap it twice" from the very first line
+window.addEventListener('pointerdown', e => { const t = e.pointerType === 'touch' || e.pointerType === 'pen'; if (t !== touchMode) { touchMode = t; if (st && st.mode === 'tutorial' && !busy && coachEl) setTimeout(coachUpdate, 0); } }, true);
 
 // ---------- settings ----------
 function applySettings() {
@@ -1377,7 +1383,7 @@ function begin(opts, c, actions) {
     S.unlock(); musicOn();
     st = actions ? C.replay(opts, actions) : C.newRun(opts);
     MX.hit(actions ? 'resume' : 'start_' + (opts.mode || 'run'));
-    if (st.invalid) { st = C.newRun(opts); }
+    if (st.invalid) { if (opts.mode === 'tutorial' && st.phase === 'over' && st.result === 'graduated') delete st.invalid; else st = C.newRun(opts); }
     ctx = c; ctx.opts = opts; ctx.ghost = opts.mode === 'tutorial' ? null : ghostFor(opts);
     ctx.lastDay = st.day; shownUids = {}; selected = -1;
     rush = opts.mode === 'rush' ? { left: RUSH_SEC, last: performance.now(), tick: 99 } : null;
@@ -1392,7 +1398,7 @@ function begin(opts, c, actions) {
   PF.adBreak(kind, go);
 }
 function openingLine() {
-  if (st.mode === 'tutorial') return 'Hi! I\u2019m a tiny bot with a tiny startup. Pay the first power bill on day 5 and you\u2019re ready.';
+  if (st.mode === 'tutorial') return 'Hi! I\u2019m a tiny bot with a tiny startup. Pay the power bill on day ' + C.T.TUTDAYS + ' and you\u2019re ready.';
   if (st.day > 1) return 'Welcome back. Day ' + st.day + '.';
   if (st.mode === 'rush') return '20 seconds a day. Go go go!';
   if (ctx.challenge) return 'Beat ' + money(ctx.challenge.p.score) + ' on this deck.';
@@ -1477,10 +1483,10 @@ const pct = v => (Math.round(v * 1000) / 10) + '%';
 function hoverCard(el) { const c = st && st.hand.find(x => String(x.uid) === el.dataset.uid); if (!c) return; const d = C.CARDS[c.id]; say('<b>' + esc(d.n) + ':</b> ' + esc(d.d), 'say', true); }
 function syncD() { D = { cash: st.cash, earned: st.earned, aud: st.aud, trust: st.trust, q: st.q, burnout: st.burnout, cpu: st.cpu, cpuMax: Math.max(st.cpu, D.cpuMax && D.day === st.day ? D.cpuMax : 0), day: st.day, products: st.products.map(p => p.uid) }; }
 function renderAll() { if (!st || !$('game')) return; syncD(); renderTop(); renderStats(); renderBiz(); renderFc(); renderCpu(); renderHand(); renderMood(); }
-function billInfo(day) { const cyc = C.cycleOf(day), amt = C.billAmt(st, cyc), due = cyc * C.CYCLE; return { cyc, amt, due, left: due - day }; }
+function billInfo(day) { const cyc = C.cycleOf(day), amt = C.billAmt(st, cyc), due = C.billDue(st, day); return { cyc, amt, due, left: due - day }; }
 function renderTop() {
   const day = st.day, b = billInfo(day);
-  $('g-day').textContent = 'Day ' + day + (st.overtime ? '' : st.mode === 'tutorial' ? ' / 5' : ' / ' + C.DAYS);
+  $('g-day').textContent = 'Day ' + day + (st.overtime ? '' : st.mode === 'tutorial' ? ' / ' + C.T.TUTDAYS : ' / ' + C.DAYS);
   $('g-bill').textContent = money(b.amt);
   $('g-due').textContent = b.left === 0 ? 'due TONIGHT' : layout.port ? 'in ' + b.left + (b.left === 1 ? ' day' : ' days') : 'due day ' + b.due + ' (' + b.left + (b.left === 1 ? ' day' : ' days') + ')';
   $('g-billblk').classList.toggle('due', b.left === 0 && st.phase === 'play');
@@ -1628,6 +1634,44 @@ function banner(title, sub, cls, ms) {
   const el = document.createElement('div'); el.className = 'banner show ' + (cls || ''); el.innerHTML = '<div class="bt">' + title + '</div>' + (sub ? '<div class="bs">' + sub + '</div>' : '');
   const host = $('g-center') || stage; host.querySelectorAll('.banner').forEach(b => b.remove()); host.appendChild(el); setTimeout(() => el.remove(), Math.max(700, (ms || 1000) * (spd() || 0.5)));
 }
+// ---------- the night sales cascade (Balatro-style: each factor pops in turn, then the money rolls up) ----------
+let cz = null;
+function czClose(now) { const el = cz && cz.el; cz = null; if (!el) return; if (now || !motionOK) { el.remove(); return; } el.classList.add('out'); setTimeout(() => el.remove(), 260); }
+function czMs(ms) { const k = spd(); return !k || fast ? 0 : ms * k; }
+function czPop(el) { if (!el) return; el.classList.add('on'); if (motionOK) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); } }
+async function czOpen(e) {
+  czClose(true); const host = $('g-center'); if (!host) return;
+  const nP = e.nP != null ? e.nP : st.products.length, xs = e.xsell || 1;
+  const el = document.createElement('div'); el.className = 'cascade'; el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = '<div class="cz-row">' +
+    '<span class="cz-chip" data-z="vis">' + ic('aud') + ' <b class="v">0</b> <small>visitors</small></span>' +
+    '<span class="cz-chip" data-z="conv"><span class="cz-op">×</span> <b>' + pct(e.conv) + '</b> <small>buy</small></span>' +
+    (nP > 1 ? '<span class="cz-chip" data-z="xs"><span class="cz-op">×</span> <b>' + xsF(xs) + '</b> <small>' + nP + ' products</small></span>' : '') +
+    (e.fans ? '<span class="cz-chip fans" data-z="fans"><span class="cz-op">+</span> <b>' + e.fans + '</b> <small>launch fans</small></span>' : '') +
+    '<span class="cz-chip buy" data-z="buy"><span class="cz-op">=</span> <b>' + e.buyers + '</b> <small>' + (e.buyers === 1 ? 'buyer' : 'buyers') + '</small></span></div>' +
+    '<div class="cz-total"><span class="cz-cash">+$<b class="v">0</b></span></div>' +
+    (nP ? '' : '<div class="cz-note">No products to buy. Ship one!</div>');
+  host.appendChild(el); cz = { el, total: 0, shown: 0 };
+  const q = z => el.querySelector('[data-z="' + z + '"]');
+  czPop(q('vis')); S.play('tick', { pitch: 0.9 }); X.count(q('vis').querySelector('.v'), 0, e.visitors, czMs(320), v => String(v));
+  await wait(330);
+  czPop(q('conv')); S.play('stat', { pitch: 1.05 }); await wait(210);
+  if (q('xs')) { czPop(q('xs')); S.play('stat', { pitch: 1.15 }); await wait(210); }
+  if (q('fans')) { czPop(q('fans')); S.play('combo', { pitch: 1.2 }); X.burst(q('fans'), ['#ffcf4a', '#c6ff3d'], 14, 'conf'); await wait(320); }
+  czPop(q('buy')); S.play(e.buyers ? 'stat' : 'deny', { pitch: 1.3 }); if (e.buyers) X.pulse(q('buy')); await wait(e.buyers ? 230 : 420);
+  if (e.buyers && nP) el.querySelector('.cz-total').classList.add('on');
+}
+function czSale(amt) {
+  if (!cz) return; const v = cz.el.querySelector('.cz-total .v'), from = cz.total; cz.total += amt;
+  X.count(v, from, cz.total, czMs(220), x => String(x)); const t = cz.el.querySelector('.cz-total'); t.classList.add('on'); czPop(t);
+}
+async function czSlam(rev) {
+  if (!cz) return; const t = cz.el.querySelector('.cz-total'); t.querySelector('.v').textContent = String(rev); t.classList.add('on', 'slam');
+  const bill = billInfo(st.day).amt, prev = st.days.slice(0, -1).reduce((m, d) => Math.max(m, d.rev || 0), 0);
+  const big = rev >= bill * 0.4 || (rev >= 20 && rev > prev);
+  if (big) { t.classList.add('big'); S.play('bigcoin'); X.shake(rev >= bill); X.confetti(rev >= bill ? 90 : 45); X.burst(t, ['#ffcf4a', '#fff3b0', '#c6ff3d'], 26, 'conf'); }
+  await wait(big ? 520 : 300);
+}
 async function playEvents(E) {
   busy = true; fast = P.set.speed === 0;
   const pace = () => { if (!$('game')) throw new Error('left'); };
@@ -1647,7 +1691,7 @@ async function playEvents(E) {
         const k = STAT_KEY[e.k], el = $(STAT_EL[e.k]);
         if (e.k === 'cpu') { D.cpu = e.d === 0 ? 0 : D.cpu + e.d; D.cpuMax = Math.max(D.cpuMax, D.cpu); renderCpu(); if (e.d) { X.float(el, '+' + e.d + ' ' + ic('cpu'), 'good'); S.play('stat', { pitch: 1.2 }); } await wait(160); break; }
         let d = e.d;
-        if (e.k === 'cash' && e.src === 'sales') { d -= salesShown; salesShown = 0; }
+        if (e.k === 'cash' && e.src === 'sales') { await czSlam(e.d); d -= salesShown; salesShown = 0; }
         D[k] = Math.max(0, D[k] + d); if (e.k === 'cash' && e.d > 0) D.earned += d;
         if (d) {
           const bad = e.k === 'burn' ? d > 0 : d < 0;
@@ -1671,24 +1715,26 @@ async function playEvents(E) {
       case 'discard': if (!discarded) { discarded = true; const h = $('g-hand'); if (h && motionOK) h.classList.add('discarding'); S.play('whoosh'); await wait(260); } break;
       case 'funnel': {
         $('game').classList.add('night'); S.play('night');
-        say(ic('aud') + ' Night falls. <b>' + e.visitors + '</b> visitors × ' + pct(e.conv) + (st.products.length > 1 ? ' × ' + xsF(1 + C.T.XSELL * (st.products.length - 1)) + ' (' + st.products.length + ' products)' : '') + ' → <b>' + e.buyers + '</b> ' + (e.buyers === 1 ? 'buyer' : 'buyers') + (st.products.length ? '' : ' (no products to buy!)'), e.buyers ? 'good' : 'say');
-        X.pulse($('g-fc')); await wait(e.buyers ? 520 : 700); break;
+        await czOpen(e);
+        say(ic('aud') + ' Night falls. <b>' + e.visitors + '</b> visitors × ' + pct(e.conv) + (st.products.length > 1 ? ' × ' + xsF(1 + C.T.XSELL * (st.products.length - 1)) + ' (' + st.products.length + ' products)' : '') + (e.fans ? ' + <b>' + e.fans + '</b> launch fans' : '') + ' → <b>' + e.buyers + '</b> ' + (e.buyers === 1 ? 'buyer' : 'buyers') + (st.products.length ? '' : ' (no products to buy!)'), e.buyers ? 'good' : 'say');
+        X.pulse($('g-fc')); await wait(e.buyers ? 120 : 300); break;
       }
       case 'sale': {
         const pe = $('g-prods').querySelector('[data-i="' + e.i + '"]');
         D.cash += e.amt; D.earned += e.amt; salesShown += e.amt; saleN++;
         X.float(pe, '+$' + e.amt + (e.n > 1 ? ' <small>' + e.n + '×$' + e.price + '</small>' : ''), 'gold');
         X.coins(pe, $('g-cash'), Math.min(8, e.n + 1), () => { X.pulse($('g-cashblk')); });
-        S.play('coin', { pitch: 1 + Math.min(0.8, saleN * 0.07) });
+        S.play('coin', { pitch: 1 + Math.min(0.8, saleN * 0.07) }); czSale(e.amt);
         renderTop(); await wait(170); break;
       }
-      case 'firstsale': banner('FIRST SALE!', 'A real stranger paid real money.', 'gold', 1300); S.play('bigcoin'); X.confetti(80); renderMood('money'); await wait(1000); break;
+      case 'firstsale': czClose(); banner('FIRST SALE!', 'A real stranger paid real money.', 'gold', 1300); S.play('bigcoin'); X.confetti(80); renderMood('money'); await wait(1000); break;
       case 'fade': D.aud = Math.max(0, D.aud + e.d); X.float($('s-aud'), e.d + ' ' + ic('aud') + ' <small>fade</small>', 'dim'); renderStats(); await wait(160); break;
       case 'takedown': say(ic('copy') + ' <b>' + esc(e.p.n) + '</b> got a takedown notice. Gone.', 'bad'); renderBiz(); S.play('bad'); X.shake(false); await wait(560); break;
       case 'event': say((e.good ? ic('star2') : ic('bug')) + ' ' + esc(e.m), e.good ? 'good' : 'bad'); S.play(e.good ? 'event' : 'bad'); renderMood(e.good ? 'happy' : 'worried'); if (!e.good) X.shake(false); await wait(950); break;
       case 'burnout': banner('BURNOUT', 'You crash. No energy tomorrow.', 'bad', 1300); S.play('unplug', { pitch: 1.4 }); X.shake(true); renderMood('sleepy'); await wait(1100); break;
       case 'burnedout': say(ic('burn') + ' Recovering from burnout: no energy today.', 'bad'); await wait(500); break;
       case 'bill': {
+        czClose();
         if (e.paid) {
           D.cash = Math.max(0, D.cash - e.amt); renderTop();
           banner('BILL ' + e.cyc + ' PAID', '−' + money(e.amt) + ' · lights stay on', 'gold', 1500);
@@ -1703,9 +1749,9 @@ async function playEvents(E) {
       }
       case 'won': S.play('win'); X.confetti(150); await wait(500); break;
       case 'day': {
-        $('game').classList.remove('night');
+        czClose(); $('game').classList.remove('night');
         D.cpu = e.cpu; D.cpuMax = e.cpu; D.day = e.day;
-        if (st.mode === 'tutorial' && e.day > 1 && e.day <= 5) MX.hit('tut_day' + e.day);
+        if (st.mode === 'tutorial' && e.day > 1 && e.day <= C.T.TUTDAYS) MX.hit('tut_day' + e.day);
         const b = billInfo(e.day);
         if (e.day > 1) { renderTop(); renderCpu(); if (b.left === 0) { say(ic('cash') + ' <b>Bill day!</b> You need ' + money(b.amt) + ' by tonight. You have ' + money(D.cash) + '.', D.cash >= b.amt ? 'good' : 'bad'); S.play('tick'); } else if (!fast) S.play('tick', { vol: 0.4 }); }
         await wait(160); break;
@@ -1716,6 +1762,7 @@ async function playEvents(E) {
       case 'overtime': S.play('combo'); break;
     }
   }
+  if (cz) setTimeout(() => { if (!busy) czClose(); }, 500);
   busy = false;
 }
 
@@ -1885,12 +1932,15 @@ function skipTutorial() {
   P.tutorialDone = true; P.last = null; M.save(); showHub();
   toast(ic('book') + ' Tutorial skipped. Replay it any time from How to.', '', 2600);
 }
-function removeCoach() { if (coachEl) { coachEl.remove(); coachEl = null; } if (coachTarget) { coachTarget.classList.remove('spot'); coachTarget = null; } }
-function coachOn(target, text, noSpot) {
+let coachHand = null;
+function removeCoach() { if (coachEl) { coachEl.remove(); coachEl = null; } if (coachHand) { coachHand.remove(); coachHand = null; } if (coachTarget) { coachTarget.classList.remove('spot'); coachTarget = null; } }
+function coachOn(target, text, noSpot, hand) {
   removeCoach(); if (!target) return;
+  if (hand) { coachHand = document.createElement('div'); coachHand.className = 'chand'; coachHand.setAttribute('aria-hidden', 'true'); coachHand.innerHTML = ic('hand'); }
   coachEl = document.createElement('div'); coachEl.className = 'coach'; coachEl.setAttribute('role', 'note'); coachEl.innerHTML = text;
   (ov && ov.contains(target) ? ov : stage).appendChild(coachEl);
   coachTarget = target; if (!noSpot) target.classList.add('spot');
+  if (coachHand) coachEl.parentNode.appendChild(coachHand);
   placeCoach(); setTimeout(placeCoach, 380); setTimeout(placeCoach, 900);
 }
 function placeCoach() {
@@ -1902,16 +1952,24 @@ function placeCoach() {
   const w = Math.min(300, W - 20); coachEl.style.maxWidth = w + 'px'; coachEl.classList.remove('below', 'left', 'right');
   const cw = coachEl.offsetWidth, ch = coachEl.offsetHeight, G = 14;
   // things the bubble should not cover (besides its own target)
-  const obs = [...stage.querySelectorAll('#g-hand .card, #g-end, .deckinfo button, #g-cpu, #g-fc, #g-billblk, #g-cashblk, .stat')].filter(e => e !== coachTarget && !coachTarget.contains(e) && !e.contains(coachTarget) && e.offsetParent).map(e => Object.assign(R(e), { w: e.matches('.card, #g-end') ? 40 : e.matches('#g-cpu, #g-fc, .deckinfo button') ? 2 : 1 }));
+  const obs = [...stage.querySelectorAll('#g-hand .card, #g-end, .deckinfo button, #g-cpu, #g-fc, #g-billblk, #g-cashblk, .stat')].filter(e => e !== coachTarget && !coachTarget.contains(e) && !e.contains(coachTarget) && e.offsetParent).map(e => Object.assign(R(e), { w: e.matches('.card, #g-end, .stat') ? 40 : e.matches('#g-cpu, #g-fc, .deckinfo button') ? 2 : 1 }));
   const cost = (x, y) => { let c = 0; if (x < 6 || y < 6 || x + cw > W - 6 || y + ch > H - 6) c += 1e7; for (const o of obs) { const ox = Math.min(x + cw, o.r) - Math.max(x, o.l), oy = Math.min(y + ch, o.b) - Math.max(y, o.t); if (ox > 0 && oy > 0) c += ox * oy * o.w; } return c; };
   const xs = [clamp(cx - cw / 2, 10, W - cw - 10), clamp(T.l, 10, W - cw - 10), clamp(T.r - cw, 10, W - cw - 10)];
+  // also try sliding the bubble just clear of each big obstacle (stats column, cards) so it never has to sit on Burnout
+  obs.forEach(o => { if (o.w >= 40) { xs.push(clamp(o.r + 8, 10, W - cw - 10), clamp(o.l - cw - 8, 10, W - cw - 10)); } });
   const ys = [clamp(cy - ch / 2, 10, H - ch - 10), clamp(T.t, 10, H - ch - 10)];
   const cand = [];
-  xs.forEach((x, i) => { cand.push({ x, y: T.t - ch - G, m: '', p: i * 0.1 }); cand.push({ x, y: T.b + G, m: 'below', p: 0.5 + i * 0.1 }); });
+  xs.forEach((x, i) => { const q = Math.min(i, 3) * 0.1; cand.push({ x, y: T.t - ch - G, m: '', p: q }); cand.push({ x, y: T.b + G, m: 'below', p: 0.5 + q }); });
   ys.forEach(y => { cand.push({ x: T.r + G, y, m: 'right', p: 1 }); cand.push({ x: T.l - cw - G, y, m: 'left', p: 1 }); });
-  let best = null; for (const c of cand) { c.c = cost(c.x, c.y) + c.p * 40; if (!best || c.c < best.c) best = c; }
+  // and just past each big obstacle row above/below the target (the phone stats strip), arrow-less
+  obs.forEach(o => { if (o.w < 40) return; if (o.b + 8 > T.b + G) xs.slice(0, 3).forEach(x => cand.push({ x, y: o.b + 8, m: 'below', p: 0.8, gap: o.b + 8 - T.b - G })); if (o.t - ch - 8 < T.t - ch - G) xs.slice(0, 3).forEach(x => cand.push({ x, y: o.t - ch - 8, m: '', p: 0.8, gap: T.t - ch - G - (o.t - ch - 8) })); });
+  // how far the arrow would land from the target; the tapping hand already marks the target, so a miss is cheap with it
+  const miss = c => { if (c.m === 'left' || c.m === 'right') { const a = clamp(cy, c.y + 14, c.y + ch - 14); return Math.max(0, T.t + 6 - a, a - (T.b - 6)); } const a = clamp(cx, c.x + 16, c.x + cw - 16); return Math.max(0, T.l + 6 - a, a - (T.r - 6)); };
+  let best = null; for (const c of cand) { c.miss = miss(c) + (c.gap || 0); c.c = cost(c.x, c.y) + c.p * 40 + (c.miss - (c.gap || 0)) * (coachHand ? 100 : 400) + (c.gap || 0) * 400; if (!best || c.c < best.c) best = c; }
+  coachEl.classList.remove('noarrow'); if (best.miss > 0) coachEl.classList.add('noarrow');
   if (best.m) coachEl.classList.add(best.m);
   coachEl.style.left = best.x + 'px'; coachEl.style.top = best.y + 'px';
+  if (coachHand) { coachHand.style.left = (cx - 17) + 'px'; coachHand.style.top = (Math.min(T.b - 30, cy + 4)) + 'px'; }
   if (best.m === 'left' || best.m === 'right') coachEl.style.setProperty('--ay', clamp(cy - best.y, 14, ch - 14) + 'px');
   else coachEl.style.setProperty('--ax', clamp(cx - best.x, 16, cw - 16) + 'px');
 }
@@ -1922,14 +1980,14 @@ function coachUpdate() {
   if (st.mode === 'tutorial') {
     const t = st.today, played = t.played;
     if (st.day === 1) {
-      if (!st.products.length && cardEl('ship')) return coachOn(cardEl('ship'), 'Ship a product. ' + tap + ' to play it. It costs 2 ' + ic('cpu') + ' energy.');
-      if (played.indexOf('post') < 0 && cardEl('post')) return coachOn(cardEl('post'), 'Now tell people! Ship + Launch post on the same day = <b>LAUNCH DAY</b>, double audience.');
-      return coachOn($('g-end'), (st.hand.some((c, i) => C.canPlay(st, i)) ? 'Done for today? ' : 'Out of moves. ') + 'End the day: tonight visitors arrive and some of them buy.');
+      if (!st.products.length && cardEl('ship')) return coachOn(cardEl('ship'), 'Ship a product. <b>' + tap + '</b> to play it (2 ' + ic('cpu') + ' energy).', false, true);
+      if (played.indexOf('post') < 0 && cardEl('post')) return coachOn(cardEl('post'), 'Now tell people! <b>' + tap + '</b>. Ship + post on one day = <b>LAUNCH DAY</b>.', false, true);
+      return coachOn($('g-end'), (st.hand.some((c, i) => C.canPlay(st, i)) ? 'Done for today? ' : 'Out of moves. ') + 'End the day: tonight visitors arrive and some of them buy.', false, true);
     }
-    if (st.day === 2 && !played.length) return coachOn($('g-billblk'), 'Every 5 days the <b>power bill</b> is due. Have the cash at the end of day 5, or you get unplugged.', true);
-    if (st.day === 3 && !played.length) return coachOn($('g-fc'), 'Your forecast: visitors × buy rate → buyers. More audience, more trust and more products mean more sales.', true);
-    if (st.day === 4 && !played.length) return coachOn($('s-trust'), 'Trust sets your buy rate. Reply to comments and help people to raise it.', true);
-    if (st.day === 5 && !played.length) return coachOn($('g-billblk'), 'Bill day! Cover it tonight and the tutorial is done.', true);
+    const b = billInfo(st.day), need = Math.max(0, b.amt - st.cash);
+    if (st.day === 2 && !played.length) return coachOn($('g-billblk'), ic('plug') + ' <b>Power bill ' + money(b.amt) + '</b>, due the night of day ' + b.due + '. You have ' + money(st.cash) + (need ? ': ' + money(need) + ' to go.' : '. Covered!') + ' Play cards, then End day.', true);
+    if (st.day === 2 && played.length === 1) return coachOn($('g-fc'), ic('chart') + ' Tonight: visitors × trust → buyers. More audience, trust and products = more sales.', true);
+    if (st.day === b.due && !played.length) return coachOn($('g-billblk'), ic('cash') + ' <b>Bill day!</b> ' + (need ? 'Earn ' + money(need) + ' more tonight' : 'You can cover it') + ' and the tutorial is done.', true);
     return;
   }
   if (!P.set.hints) return;
@@ -1982,7 +2040,7 @@ function boot() {
   if (!P.tutorialDone && !P.last && !challenge && (P.runs || 0) === 0 && !P.legacy) startTutorial(); else if (wantDaily && !P.last) { showHub(); startDaily(); } else showHub();
   const ld = $('loader'); if (ld) { ld.classList.add('done'); setTimeout(() => { ld.hidden = true; }, 350); }
   PF.hook('ready');
-  window.BURN_DEBUG = { get st() { return st; }, get busy() { return busy; }, get ov() { return ov; }, act: doAct, hub: showHub, startDaily, startRush, startRun, startTutorial, C, B, M, layout: () => layout, renderAll };
+  window.BURN_DEBUG = { get st() { return st; }, get busy() { return busy; }, get ov() { return ov; }, act: doAct, hub: showHub, startDaily, startRush, startRun, startTutorial, C, B, M, layout: () => layout, renderAll, applySettings };
 }
 try { boot(); } catch (e) { console.error(e); PF.showError(e && e.message); }
 })();

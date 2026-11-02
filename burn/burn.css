@@ -183,6 +183,7 @@ input,textarea,select{font:inherit;color:inherit;user-select:text;-webkit-user-s
 .coach.right::after,.coach.left::after{left:auto;bottom:auto;top:var(--ay,50%);margin:-9px 0 0;border:9px solid transparent}
 .coach.right::after{left:-9px;border-left:0;border-right-color:var(--cyan)}
 .coach.left::after{right:-9px;border-right:0;border-left-color:var(--cyan)}
+.coach.noarrow::after{display:none}
 .spot{box-shadow:0 0 0 4px var(--cyan),0 0 26px 6px #3de0ff88!important;animation:spot 1.2s infinite}
 @keyframes spot{50%{box-shadow:0 0 0 4px var(--cyan),0 0 6px 2px #3de0ff44}}
 .skiphint{position:absolute;right:14px;bottom:8px;font-size:12px;color:var(--muted);z-index:20;pointer-events:none}
@@ -343,7 +344,7 @@ input,textarea,select{font:inherit;color:inherit;user-select:text;-webkit-user-s
 .port .center .col{display:flex}
 .port .center .bubble,.port .center .forecast{order:0}
 .game{transition:background-color .4s}
-.game.night .center,.game.night .stats,.game.night .biz{filter:brightness(.82) saturate(.9)}
+.game.night .center>:not(.cascade),.game.night .stats,.game.night .biz{filter:brightness(.82) saturate(.9)}
 .game.dead{filter:grayscale(.85) brightness(.7);transition:filter .8s}
 .endsheet{max-height:calc(100% - 8px);overflow:auto}
 .endgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
@@ -458,3 +459,33 @@ input[type=range]{min-height:50px}
 .itchask .btn{min-height:52px;padding:0 12px;font-size:14px;white-space:nowrap;color:var(--pink);border-color:var(--pink)}
 .itchask .ibtn{width:52px;height:52px;font-size:16px}
 .sbonus{color:var(--lime,#c6ff3d);font-weight:800;white-space:nowrap}
+
+/* night sales cascade */
+.cascade{position:absolute;left:50%;top:6px;transform:translateX(-50%);z-index:28;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 14px 12px;border-radius:16px;background:#0b0f0c;border:1px solid #ffffff2a;box-shadow:0 10px 30px #000a;width:max-content;max-width:640px;transition:opacity .25s,transform .25s}
+.cascade.out{opacity:0;transform:translateX(-50%) translateY(-8px)}
+.cz-row{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.cz-chip{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:999px;background:#1b2219;border:1px solid #ffffff22;color:var(--text);font-weight:800;font-size:15px;white-space:nowrap;opacity:.18}
+.cz-chip .ic{width:16px;height:16px}
+.cz-chip b{font-size:18px;color:#fff;font-variant-numeric:tabular-nums}
+.cz-chip small{font-size:12px;color:var(--muted);font-weight:700}
+.cz-op{color:var(--cyan);font-weight:900}
+.cz-chip.on{opacity:1}
+.cz-chip.fans{background:#2a2410;border-color:#ffcf4a66}.cz-chip.fans b{color:var(--gold)}
+.cz-chip.buy{background:#17240c;border-color:#c6ff3d66}.cz-chip.buy b{color:var(--lime)}
+.cz-total{opacity:0;font-size:40px;font-weight:900;line-height:1;color:var(--gold);text-shadow:0 3px 0 #0009,0 0 24px #ffcf4a55;font-variant-numeric:tabular-nums;-webkit-text-stroke:1px #2a1f00}
+.cz-total.on{opacity:1}
+.cz-total.slam.big{font-size:52px;color:#ffe066;text-shadow:0 4px 0 #0009,0 0 40px #ffcf4aaa}
+.cz-note{font-size:13px;font-weight:800;color:var(--red)}
+.pop{animation:czPop .32s cubic-bezier(.2,1.8,.4,1)}
+.cz-total.slam{animation:czSlam .42s cubic-bezier(.2,1.8,.4,1)}
+@keyframes czPop{0%{transform:scale(.6)}100%{transform:scale(1)}}
+@keyframes czSlam{0%{transform:scale(1.6)}60%{transform:scale(.92)}100%{transform:scale(1)}}
+.port .cascade{top:2px;width:max-content;max-width:372px;padding:7px 10px 9px;gap:4px}
+.port .cz-chip{font-size:13px;padding:4px 8px}.port .cz-chip b{font-size:15px}.port .cz-chip small{font-size:11px}
+.port .cz-total{font-size:32px}.port .cz-total.slam.big{font-size:40px}
+.calm .pop,.calm .cz-total.slam{animation:none}
+/* coach hand */
+.chand{position:absolute;z-index:36;width:34px;height:34px;pointer-events:none;color:#fff;filter:drop-shadow(0 2px 3px #000c);animation:chand 1s ease-in-out infinite}
+.chand .ic{width:34px;height:34px;stroke-width:2.2;fill:#3de0ff}
+@keyframes chand{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+.calm .chand{animation:none}
