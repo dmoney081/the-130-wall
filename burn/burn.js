@@ -1108,6 +1108,40 @@ const MX = (function () {
   }
   return { hit, boot };
 })();
+// Global daily rank (site build only, Daily only, first finish of today's deck per device). Same anonymous public
+// counters: per deck number, n = finishers and ge<k> = finishers who scored at least E[k]. Read 3 numbers, then add
+// this run (n first, then ge0..ge<k> ascending, 500 ms apart: well inside Abacus' 30 requests / 10 s).
+const RANK = (function () {
+  const real = /\.github\.io$/.test(location.hostname), NS = 'burnrate-secretwall-v2' + (real ? '' : '-test'), base = 'https://abacus.jasoncameron.dev/';
+  let on = false;
+  try { on = (real || window.BURN_METRICS_FORCE === true) && navigator.doNotTrack !== '1' && navigator.globalPrivacyControl !== true; } catch (_) {}
+  const E = []; for (let k = 0; k <= 20; k++) E.push(Math.round(25 * Math.pow(2, k / 2)));   // $25 … $25,600
+  const bucket = v => { let k = -1; for (let j = 0; j < E.length; j++) if (v >= E[j]) k = j; return k; };
+  const opt = { mode: 'cors', credentials: 'omit', referrerPolicy: 'no-referrer', cache: 'no-store' };
+  function get(key) {
+    return new Promise(res => { let done = false; const ac = typeof AbortController === 'function' ? new AbortController() : null;
+      const fin = v => { if (done) return; done = true; clearTimeout(t); res(v); }, t = setTimeout(() => { try { if (ac) ac.abort(); } catch (_) {} fin(null); }, 4000);
+      try { fetch(base + 'info/' + NS + '/' + key, Object.assign({ signal: ac ? ac.signal : undefined }, opt)).then(r => r.ok ? r.json() : null).then(j => fin(j && typeof j.value === 'number' ? Math.max(0, j.value) : null)).catch(() => fin(null)); } catch (_) { fin(null); } });
+  }
+  function hit(key) { try { fetch(base + 'hit/' + NS + '/' + key, opt).catch(() => {}); } catch (_) {} }
+  // others above me ≈ ge_{k+1} + (ge_k − ge_{k+1})·(1 − f), f = log-position of the score inside its bucket
+  function estimate(score, n, geK, geK1, k) {
+    n = Math.max(0, n || 0); geK = Math.min(n, k < 0 ? n : Math.max(0, geK || 0)); geK1 = Math.min(geK, Math.max(0, geK1 || 0));
+    const lo = k < 0 ? 0 : E[k], hi = k + 1 < E.length ? E[k + 1] : E[E.length - 1] * Math.SQRT2;
+    const f = k < 0 ? Math.min(1, score / E[0]) : Math.max(0, Math.min(1, Math.log(Math.max(score, lo) / lo) / Math.log(hi / lo)));
+    const above = geK1 + (geK - geK1) * (1 - f), beaten = Math.max(0, n - above);
+    return { M: n + 1, n, pct: n ? Math.min(99, Math.round(100 * beaten / n)) : 0 };
+  }
+  function writes(k) { const w = ['n']; for (let j = 0; j <= k; j++) w.push('ge' + j); return w; }
+  async function run(deck, score) {
+    if (!on) return null; const k = bucket(score), d = 'rank_d' + deck + '_';
+    const r = await Promise.all([get(d + 'n'), k >= 0 ? get(d + 'ge' + k) : Promise.resolve(0), k + 1 < E.length ? get(d + 'ge' + (k + 1)) : Promise.resolve(0)]);
+    writes(k).forEach((x, i) => setTimeout(() => hit(d + x), 600 + i * 500));
+    if (r.some(v => v === null)) return null;   // could not read: the run is still counted, the screen keeps the simulated line
+    return estimate(score, r[0], r[1], r[2], k);
+  }
+  return { get on() { return on; }, E, bucket, estimate, writes, run };
+})();
 
 // ---------- helpers ----------
 const $ = id => document.getElementById(id);
@@ -1333,7 +1367,7 @@ function showHubBind() {
   view.querySelectorAll('[data-go]').forEach(b => b.onclick = () => { S.play('tap'); const g = b.dataset.go; if (g === 'daily') startDaily(); else if (g === 'run') runSetup(); else if (g === 'rush') startRush(); else if (g === 'continue') continueRun(); else if (g === 'challenge') startChallenge(); });
   view.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => { S.play('tap'); PANELS[b.dataset.nav](); });
 }
-function resultText(s) { return s.result === 'graduated' ? 'done on day 5' : s.result === 'won' ? 'won on day 25' : s.result === 'ipo' ? 'IPO on day 50' : s.result === 'overtime' ? 'all bills paid, overtime ended on day ' + s.day : s.result === 'unplugged' ? 'unplugged on day ' + s.day : 'day ' + s.day; }
+function resultText(s) { return s.result === 'graduated' ? 'done on day ' + C.T.TUTDAYS : s.result === 'won' ? 'won on day 25' : s.result === 'ipo' ? 'IPO on day 50' : s.result === 'overtime' ? 'all bills paid, overtime ended on day ' + s.day : s.result === 'unplugged' ? 'unplugged on day ' + s.day : 'day ' + s.day; }
 function dayOfSeed(seed) { for (let i = 0; i < 60; i++) { const d = M.addDays(todayYmd(), -i); if (C.dailySeed(d) === seed) return d; } return null; }
 
 // ---------- starting runs ----------
@@ -1825,6 +1859,10 @@ function showEnd() {
     left += '<div class="li itchask" id="e-itch">' + ic('star2') + '<span class="grow" style="font-size:13px"><b>Enjoying it?</b> Rate it or leave a comment on itch. It really helps.</span><a class="btn" id="e-itch-go" href="https://secretwall.itch.io/burn-rate" target="_blank" rel="noopener">Rate on itch</a><button type="button" class="ibtn" id="e-itch-x" aria-label="No thanks">' + ic('close') + '</button></div>'; }
   if (g) left += '<div class="li ' + (beat ? 'me' : 'bot') + '">' + ic('ghost') + '<span class="grow" style="font-size:14px">' + (beat ? '<b>You beat BurnBot!</b> It made ' + money(g.total) + ' on this deck.' : 'BurnBot made <b>' + money(g.total) + '</b> on this deck. ' + (s.earned >= g.total * 0.8 ? 'So close.' : 'Next time.')) + '</span></div>';
   if (ctx.challenge) { const cs = ctx.challenge.p.score; left += '<div class="li ' + (s.earned > cs ? 'me' : 'bot') + '">' + ic('trophy') + '<span class="grow" style="font-size:14px">' + (s.earned > cs ? '<b>Challenge beaten!</b> ' : 'Challenge: ') + 'your friend scored ' + money(cs) + '.</span></div>'; }
+  let grank = false;
+  if (s.mode === 'daily' && ctx.mode === 'daily' && !ctx.challenge && ctx.seedDay === todayYmd() && fin.first && RANK.on && !(P.rank && P.rank.day === ctx.seedDay)) {
+    grank = true; P.rank = { day: ctx.seedDay, k: RANK.bucket(s.earned), score: s.earned }; M.save();
+    left += '<div class="li" id="e-grank">' + ic('trophy') + '<span class="grow muted" style="font-size:13px">Checking today\u2019s players\u2026</span></div>'; }
   if (s.mode !== 'tutorial') left += '<div class="li" id="e-pct">' + ic('chart') + '<span class="grow muted" style="font-size:13px">Simulating 240 players on this deck…</span></div>';
   if (s.mode !== 'tutorial' && fin.xp > 0 && PF.canReward()) left += '<div class="row c"><button type="button" class="btn rewb" data-a="rew">\u{1F3AC} Watch an ad: double XP (+' + fin.xp + ')</button></div>';
   if (LINKS.tip && !askItch && s.mode !== 'tutorial') left += '<div class="tipline">Enjoying Burn Rate? It\u2019s free. <a href="' + LINKS.tip + '" target="_blank" rel="noopener">' + ic('coffee') + ' Tip the developer</a></div>';
@@ -1851,6 +1889,12 @@ function showEnd() {
     const ups = M.grantXp(fin.xp); b.closest('.row').innerHTML = '<span class="chip lime">' + ic('star2') + ' +' + fin.xp + ' bonus XP' + (ups.length ? ' · Level ' + ups[ups.length - 1].lvl + '!' : '') + '</span>'; S.play(ups.length ? 'level' : 'combo');
     const L2 = M.levelOf(P.xp), x = $('e-xp'); if (x) x.style.width = Math.round(100 * L2.into / L2.need) + '%'; }); });
   if (s.mode !== 'tutorial') percentile(ctx.opts, s.earned);
+  if (grank) { const myRun = st, deck = M.deckNo(ctx.seedDay);
+    RANK.run(deck, s.earned).then(r => { if (st !== myRun) return; const el = $('e-grank'); if (!el) return;
+      if (!r) { el.remove(); return; }
+      if (r.M >= 10) { ctx.grank = r; el.classList.add('me'); el.innerHTML = ic('trophy') + '<span class="grow" style="font-size:14px">Better than <b>' + r.pct + '%</b> of <b>' + r.M + '</b> players today.<br><span class="muted" style="font-size:12px">Real players on Daily #' + deck + ', counted anonymously (first try only).</span></span>'; }
+      else el.innerHTML = ic('trophy') + '<span class="grow" style="font-size:13px"><b>' + r.M + '</b> ' + (r.M === 1 ? 'player has' : 'players have') + ' finished Daily #' + deck + ' so far. Global rank opens at 10.</span>';
+    }).catch(() => { const el = $('e-grank'); if (el) el.remove(); }); }
 }
 function calHTML() {
   let h = ''; const today = todayYmd();
@@ -1869,9 +1913,30 @@ function percentile(opts, score) {
   };
   setTimeout(step, 400);
 }
+// Spoiler-free day grid: one row per bill cycle (5 days), one square per day coloured by that day's sales vs the
+// cycle's pace (bill ÷ 5): green ≥ pace, yellow ≥ half, black below; ✅ bill paid / ❌ unplugged. Max 10 rows.
+const GRID_MAX = 10;
+function gridRows(s) {
+  const rows = [], days = s.days || [];
+  for (let i = 0; i < days.length; i += C.CYCLE) {
+    const cyc = i / C.CYCLE + 1, pace = C.billAmt(s, cyc) / C.CYCLE, cells = [];
+    for (let j = i; j < Math.min(days.length, i + C.CYCLE); j++) { const r = days[j].rev || 0; cells.push(r >= pace ? 'g' : r >= pace / 2 ? 'y' : 'k'); }
+    rows.push({ cells, paid: cyc <= s.billsPaid, done: cells.length === C.CYCLE });
+  }
+  return rows;
+}
+function gridText(s) {
+  const SQ = { g: '\u{1F7E9}', y: '\u{1F7E8}', k: '\u2B1B' }, rows = gridRows(s), out = [];
+  rows.slice(0, GRID_MAX).forEach(r => out.push(r.cells.map(c => SQ[c]).join('') + (r.done ? ' ' + (r.paid ? '\u2705' : '\u274C') : '')));
+  if (rows.length > GRID_MAX) { let more = 0; rows.slice(GRID_MAX).forEach(r => more += r.cells.length); out.push('+' + more + ' more days'); }
+  return out.join('\n');
+}
 function shareText(s, code) {
-  const cyc = []; for (let i = 0; i < s.billsPaid; i++) cyc.push('\u{1F7E9}'); if (s.result === 'unplugged' || s.result === 'overtime') cyc.push('\u{1F7E5}');
-  let t = 'Burn Rate \u{1F525} ' + modeLabel(ctx) + '\n' + money(s.earned) + ' · ' + C.rankOf(s.earned) + ' · ' + resultText(s) + '\n' + cyc.join('') + (ctx.ghost ? (s.earned > ctx.ghost.total ? ' beat BurnBot' : '') : '') + (ctx.pct != null ? ' · top ' + Math.max(1, 100 - ctx.pct) + '% (simulated)' : '');
+  const extra = [];
+  if (ctx.ghost && s.earned > ctx.ghost.total) extra.push('Beat BurnBot');
+  if (ctx.grank && ctx.grank.M >= 10) extra.push('better than ' + ctx.grank.pct + '% of ' + ctx.grank.M + ' players today');
+  else if (ctx.pct != null) extra.push('top ' + Math.max(1, 100 - ctx.pct) + '% (simulated)');
+  let t = 'Burn Rate \u{1F525} ' + modeLabel(ctx) + ' · ' + money(s.earned) + '\n' + C.rankOf(s.earned) + ' · ' + resultText(s) + '\n' + gridText(s) + (extra.length ? '\n' + extra.join(' · ') : '');
   if (LINKS.challenge && LINKS.share) t += '\nBeat me on the same deck: ' + LINKS.share + '?c=' + encodeURIComponent(code);
   else { if (LINKS.share) t += '\nPlay: ' + LINKS.share; t += '\nMy code: ' + code; }
   return t;
@@ -1886,7 +1951,7 @@ async function shareRun(s, code) {
     }
   } catch (e) { if (e && e.name === 'AbortError') return; }
   const ok = await copyText(text);
-  const o = openOv('<h3>' + (ok ? 'Result copied!' : 'Share your run') + '</h3><textarea class="field" rows="5" readonly>' + esc(text) + '</textarea>' + (blob ? '<div class="row c"><button type="button" class="btn" id="sh-img">' + ic('share') + ' Save image</button></div>' : ''), { w: 460 });
+  const o = openOv('<h3>' + (ok ? 'Result copied!' : 'Share your run') + '</h3><textarea class="field" rows="8" readonly>' + esc(text) + '</textarea>' + (blob ? '<div class="row c"><button type="button" class="btn" id="sh-img">' + ic('share') + ' Save image</button></div>' : ''), { w: 460 });
   if (ok) S.play('coin');
   const b = o.querySelector('#sh-img'); if (b) b.onclick = () => { try { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = 'burn-rate-' + (ctx.seedDay || 'run') + '.png'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000); } catch (_) {} };
 }
@@ -1898,10 +1963,15 @@ function shareImage(s) {
     const F = w => w + ' system-ui,-apple-system,Segoe UI,Roboto,sans-serif';
     g.fillStyle = '#e9e6dc'; g.font = F('900 64px'); g.fillText('BURN', 70, 120); g.fillStyle = '#ff7a2a'; g.fillText('RATE', 250, 120);
     g.fillStyle = '#9b98a8'; g.font = F('700 28px'); g.fillText(modeLabel(ctx) + ' · ' + resultText(s), 70, 170);
-    g.fillStyle = '#ffcf4a'; g.font = F('900 150px'); g.fillText(money(s.earned), 64, 340);
+    g.fillStyle = '#ffcf4a'; let fs = 150; g.font = F('900 ' + fs + 'px'); while (fs > 60 && g.measureText(money(s.earned)).width > 630) { fs -= 6; g.font = F('900 ' + fs + 'px'); } g.fillText(money(s.earned), 64, 340);
     g.fillStyle = '#c6ff3d'; g.font = F('900 44px'); g.fillText(C.rankOf(s.earned), 70, 410);
-    for (let i = 0; i < 5; i++) { g.fillStyle = i < s.billsPaid ? '#c6ff3d' : (i === s.billsPaid && s.billsPaid < 5 ? '#ff4d5e' : '#2b2b3a'); g.beginPath(); if (g.roundRect) g.roundRect(70 + i * 76, 450, 62, 62, 14); else g.rect(70 + i * 76, 450, 62, 62); g.fill(); }
-    g.fillStyle = '#9b98a8'; g.font = F('700 26px'); g.fillText('Bills paid', 70, 555); g.fillText('Pay the power bill or get unplugged.', 70, 595);
+    // same spoiler-free grid as the share text: rows = bill cycles, squares = days
+    // up to 5 rows per column, a second column for cycles 6-10
+    const rows = gridRows(s).slice(0, GRID_MAX), per = 5, nr = Math.max(1, Math.min(per, rows.length)), cs = Math.min(30, Math.floor(165 / nr) - 5), gap = Math.max(4, Math.round(cs / 5)), colW = C.CYCLE * (cs + gap) + cs + 24, COL = { g: '#5fd35f', y: '#ffcf4a', k: '#2b2b3a' };
+    const sq = (x, y, c) => { g.fillStyle = c; g.beginPath(); if (g.roundRect) g.roundRect(x, y, cs, cs, Math.round(cs / 4)); else g.rect(x, y, cs, cs); g.fill(); };
+    rows.forEach((r, i) => { const x0 = 70 + Math.floor(i / per) * colW, y = 440 + (i % per) * (cs + gap); r.cells.forEach((c, j) => sq(x0 + j * (cs + gap), y, COL[c]));
+      if (r.done) { g.fillStyle = r.paid ? '#c6ff3d' : '#ff4d5e'; g.font = F('900 ' + Math.round(cs * 0.9) + 'px'); g.fillText(r.paid ? '\u2713' : '\u2717', x0 + C.CYCLE * (cs + gap) + 4, y + cs * 0.85); } });
+    g.fillStyle = '#9b98a8'; g.font = F('700 26px'); g.fillText(s.billsPaid + (s.billsPaid === 1 ? ' bill' : ' bills') + ' paid', 720, 555); g.fillText('Pay the power bill or get unplugged.', 720, 595);
     const img = new Image(); const svg = A.bot(s.billsPaid >= 5 ? 'happy' : 'sad', M.owns('skin', P.cos.skin) ? P.cos.skin : 'classic').replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="420" height="355" ');
     const fin = () => { try { cv.toBlob(b => b ? res(b) : rej(), 'image/png'); } catch (e) { rej(e); } };
     img.onload = () => { try { g.drawImage(img, 720, 150, 420, 355); } catch (_) {} fin(); }; img.onerror = fin;
@@ -2040,7 +2110,8 @@ function boot() {
   if (!P.tutorialDone && !P.last && !challenge && (P.runs || 0) === 0 && !P.legacy) startTutorial(); else if (wantDaily && !P.last) { showHub(); startDaily(); } else showHub();
   const ld = $('loader'); if (ld) { ld.classList.add('done'); setTimeout(() => { ld.hidden = true; }, 350); }
   PF.hook('ready');
-  window.BURN_DEBUG = { get st() { return st; }, get busy() { return busy; }, get ov() { return ov; }, act: doAct, hub: showHub, startDaily, startRush, startRun, startTutorial, C, B, M, layout: () => layout, renderAll, applySettings };
+  window.BURN_DEBUG = { get st() { return st; }, get busy() { return busy; }, get ov() { return ov; }, act: doAct, hub: showHub, startDaily, startRush, startRun, startTutorial, C, B, M, layout: () => layout, renderAll, applySettings, gridRows, gridText, shareText: (code) => shareText(st, code) };
+  window.BURN_DEBUG.RANK = RANK;
 }
 try { boot(); } catch (e) { console.error(e); PF.showError(e && e.message); }
 })();
