@@ -721,7 +721,10 @@ function bot(mood, skin) {
   const sweat = mood === 'worried' ? '<path d="M100 30q5 8 0 12q-5-4 0-12z" fill="#3de0ff"/>' : '';
   return '<svg class="bot-svg mood-' + (mood || 'idle') + '" viewBox="-4 -4 128 108" aria-hidden="true">' + head + screen + '<g class="face">' + face(mood, k.glow) + '</g>' + blush + z + sweat + '</svg>';
 }
-window.BurnArt = { icon, fx, bot, SKINS, CARD_ICON, TOOL_ICON, TAG_ICON };
+/*ATLASMAP*/const PIC = {"ship":"0% 0%","polish":"12.5% 0%","mvp":"25% 0%","hotfix":"37.5% 0%","bigship":"50% 0%","refactor":"62.5% 0%","raise":"75% 0%","bundle":"87.5% 0%","api":"100% 0%","freetoy":"0% 14.2857%","post":"12.5% 14.2857%","thread":"25% 14.2857%","meme":"37.5% 14.2857%","video":"50% 14.2857%","collab":"62.5% 14.2857%","seo":"75% 14.2857%","letter":"87.5% 14.2857%","ads":"100% 14.2857%","hunt":"0% 28.5714%","give":"12.5% 28.5714%","reply":"25% 28.5714%","help":"37.5% 28.5714%","docs":"50% 28.5714%","honest":"62.5% 28.5714%","refunds":"75% 28.5714%","oss":"87.5% 28.5714%","testi":"100% 28.5714%","support":"0% 42.8571%","nap":"12.5% 42.8571%","coffee":"25% 42.8571%","allnight":"37.5% 42.8571%","weekend":"50% 42.8571%","focus":"62.5% 42.8571%","plan":"75% 42.8571%","grass":"87.5% 42.8571%","overpromise":"100% 42.8571%","clone":"0% 57.1429%","fakerev":"12.5% 57.1429%","spam":"25% 57.1429%","dark":"37.5% 57.1429%","sponsor":"50% 57.1429%","refundreq":"62.5% 57.1429%","exposed":"75% 57.1429%","bug":"87.5% 57.1429%","checkout":"100% 57.1429%","T:changelog":"0% 71.4286%","T:tipjar":"12.5% 71.4286%","T:caffeine":"25% 71.4286%","T:monitor":"37.5% 71.4286%","T:mailing":"50% 71.4286%","T:analytics":"62.5% 71.4286%","T:cdn":"75% 71.4286%","T:monitor2":"87.5% 71.4286%","T:referral":"100% 71.4286%","T:discord":"0% 85.7143%","T:autopost":"12.5% 85.7143%","T:pricing":"25% 85.7143%","T:gpu":"37.5% 85.7143%","T:cat":"50% 85.7143%","T:stickers":"62.5% 85.7143%","T:savings":"75% 85.7143%","T:duck":"87.5% 85.7143%","T:policy":"100% 85.7143%","T:kanban":"0% 100%","T:ghost":"12.5% 100%"};/*ATLASMAP-END*/
+// art tile for a card or tool id ('' when none): drawn over the icon, which stays as the fallback
+function pic(id) { const v = PIC[id]; return v ? '<i class="pic" style="background-position:' + v + '"></i>' : ''; }
+window.BurnArt = { icon, fx, bot, pic, SKINS, CARD_ICON, TOOL_ICON, TAG_ICON };
 })();
 
 /* ---- js/sfx.js ---- */
@@ -1243,7 +1246,7 @@ function cardHTML(c, o) {
   const label = d.n + ', costs ' + k + ' energy. ' + fxText.replace(/\{(\w+)\}/g, (m, t) => ' ' + ({ aud: 'audience', trust: 'trust', cash: 'cash', q: 'quality', burn: 'burnout', cpu: 'energy', prod: 'product', card: 'card' }[t] || t)) + (o.off === 'cpu' ? '. Not enough energy.' : o.off === 'cash' ? '. Not enough cash.' : '');
   return '<button type="button" class="' + cls + '"' + (o.uid != null ? ' data-uid="' + o.uid + '"' : '') + (o.attr || '') + (o.style ? ' style="' + o.style + '"' : '') + ' aria-label="' + esc(label) + '"' + (o.off ? ' aria-disabled="true"' : '') + '>' +
     '<span class="cost' + (k === 0 ? ' zero' : k < base ? ' cheap' : '') + '">' + k + '</span>' +
-    '<span class="art">' + ic(A.CARD_ICON[id] || 'card') + '</span>' +
+    '<span class="art' + (A.pic(id) ? ' hp' : '') + '">' + A.pic(id) + ic(A.CARD_ICON[id] || 'card') + '</span>' +
     '<span class="nm">' + esc(d.n) + '</span><span class="fx">' + A.fx(fxText) + '</span>' +
     (o.big ? '<span class="desc">' + esc(d.d) + '</span>' : '') +
     '<span class="tagl">' + C.TAGS[d.tag] + '<i class="rar r' + Math.min(2, d.rar) + '"></i></span>' + need + '</button>';
@@ -2116,7 +2119,7 @@ function boot() {
   if (!P.tutorialDone && !P.last && !challenge && (P.runs || 0) === 0 && !P.legacy) startTutorial(); else if (wantDaily && !P.last) { showHub(); startDaily(); } else showHub();
   const ld = $('loader'); if (ld) { ld.classList.add('done'); setTimeout(() => { ld.hidden = true; }, 350); }
   PF.hook('ready');
-  window.BURN_DEBUG = { get st() { return st; }, get busy() { return busy; }, get ov() { return ov; }, act: doAct, hub: showHub, startDaily, startRush, startRun, startTutorial, C, B, M, layout: () => layout, renderAll, applySettings, gridRows, gridText, shareText: (code) => shareText(st, code) };
+  window.BURN_DEBUG = { cardHTML, toolHTML, get st() { return st; }, get busy() { return busy; }, get ov() { return ov; }, act: doAct, hub: showHub, startDaily, startRush, startRun, startTutorial, C, B, M, layout: () => layout, renderAll, applySettings, gridRows, gridText, shareText: (code) => shareText(st, code) };
   window.BURN_DEBUG.RANK = RANK;
 }
 try { boot(); } catch (e) { console.error(e); PF.showError(e && e.message); }
