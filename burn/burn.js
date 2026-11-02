@@ -1080,7 +1080,7 @@ LINKS.share = (function () { try { return location.origin + location.pathname; }
 // Anonymous play counters (site build only). No cookies, no IDs, nothing personal: each event just adds 1 to a
 // public counter (abacus.jasoncameron.dev, free, no account). Off on localhost, off with Do Not Track / GPC.
 const MX = (function () {
-  const NS = 'burnrate-secretwall-v2', base = 'https://abacus.jasoncameron.dev/hit/' + NS + '/';
+  const real = /\.github\.io$/.test(location.hostname), NS = 'burnrate-secretwall-v2' + (real ? '' : '-test'), base = 'https://abacus.jasoncameron.dev/hit/' + NS + '/';   // forced/test runs never touch the real counters
   let on = false;
   try { on = (/\.github\.io$/.test(location.hostname) || window.BURN_METRICS_FORCE === true) && navigator.doNotTrack !== '1' && navigator.globalPrivacyControl !== true; } catch (_) {}
   const sent = {};
