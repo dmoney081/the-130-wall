@@ -166,6 +166,7 @@ input,textarea,select{font:inherit;color:inherit;user-select:text;-webkit-user-s
 @keyframes drop{to{transform:translateY(160px) rotate(8deg);opacity:0}}
 .floater{position:absolute;z-index:45;pointer-events:none;transform:translate(-50%,-50%);font-size:20px;font-weight:900;white-space:nowrap;text-shadow:0 2px 0 #000,0 0 10px #000;animation:floatUp 1.05s ease-out forwards}
 .floater.good{color:var(--lime)}.floater.bad{color:var(--red)}.floater.gold{color:var(--gold);font-size:24px}.floater.dim{color:var(--muted);font-size:16px}
+.port .floater{font-size:16px}.port .floater.gold{font-size:19px}.port .floater.dim{font-size:14px}
 @keyframes floatUp{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}15%{opacity:1;transform:translate(-50%,-70%) scale(1.15)}100%{opacity:0;transform:translate(-50%,-190%) scale(1)}}
 .pulse{animation:pulse .45s}
 @keyframes pulse{40%{transform:scale(1.08);border-color:var(--lime)}}

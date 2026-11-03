@@ -905,15 +905,31 @@ function coins(from, to, n, done) {
   for (let i = 0; i < n; i++) parts.push({ k: 'coin', x: a.x + (Math.random() - .5) * 30, y: a.y + (Math.random() - .5) * 20, tx: b.x, ty: b.y, cx: (Math.random() - .5) * 60, cy: 40 + Math.random() * 60, r: 6, t0: now + i * 40, life: (520 + i * 30) / speed, done: () => { if (!fired) { fired = true; done && done(); } } });
   kick();
 }
-// floating "+12" text above an element
-const flo = new WeakMap();
+// floating "+12" text above an element. Each new floater is placed where its whole rise stays clear of the
+// floaters still alive (lanes above/below/beside the target), and kept inside the stage. At most 8 alive.
+let live = [];
+// a floater sweeps from just below its anchor to ~1.9 heights above it; two floaters clash when those sweeps overlap
+// (checked on space only, so it holds even when a slow device lags the animation clock)
+function flHits(a, b) {
+  const ix = (a.w + b.w) / 2 * 1.1 + 6 - Math.abs(a.x - b.x); if (ix <= 0) return 0;
+  const top = f => f.y - (f.m ? 1.95 : 1.25) * f.h, bot = f => f.y + (f.m ? .35 : -.2) * f.h;
+  const iy = Math.min(bot(a), bot(b)) - Math.max(top(a), top(b)); return iy > 0 ? ix * iy : 0; }
 function float(el, text, cls) {
   if (!stage) return; const c = at(el);
   const d = document.createElement('div'); d.className = 'floater ' + (cls || ''); d.innerHTML = text;
-  // stack floaters on the same target instead of drawing them on top of each other; keep at most 8 alive
-  const now = Date.now(), key = el && typeof el === "object" ? el : null, rec = (key && flo.get(key)) || { t: 0, n: 0 }; rec.n = now - rec.t < 700 ? rec.n + 1 : 0; rec.t = now; if (key) flo.set(key, rec);
   const all = stage.querySelectorAll('.floater'); if (all.length >= 8) all[0].remove();
-  d.style.left = c.x + 'px'; d.style.top = (c.y + (rec.n % 4) * 26) + 'px'; stage.appendChild(d);
+  d.style.visibility = 'hidden'; d.style.left = '0px'; d.style.top = '0px'; stage.appendChild(d);
+  const w = d.offsetWidth || 40, h = d.offsetHeight || 24, W = stage.offsetWidth, H = stage.offsetHeight, now = performance.now() / 1000;
+  live = live.filter(f => f.el.isConnected);
+  const mx = w * .58 + 4, lo = motion ? 1.9 * h + 4 : 1.2 * h + 4, hi = H - .75 * h - 4;
+  const fit = (x, y) => ({ x: Math.min(Math.max(x, mx), Math.max(mx, W - mx)), y: Math.min(Math.max(y, lo), Math.max(lo, hi)) });
+  let best = null;
+  search: for (const dy of [0, -1, 1, -2, 2, -3]) for (const dx of [0, .5, -.5, 1, -1, 1.5, -1.5, 2, -2]) {
+    const q = fit(c.x + dx * (w + 8), c.y + dy * h * (motion ? 2.4 : 1.6)), f = { x: q.x, y: q.y, w, h, t0: now, m: motion };
+    const hit = live.reduce((s, o) => s + flHits(f, o), 0), cost = hit * 100 + Math.abs(dx) + Math.abs(dy) * 1.5;
+    if (!best || cost < best.cost) best = { f, cost }; if (!hit) break search; }
+  const f = best.f; f.el = d; live.push(f);
+  d.style.left = f.x + 'px'; d.style.top = f.y + 'px'; d.style.visibility = '';
   setTimeout(() => d.remove(), motion ? 1100 : 900);
 }
 function shake(big) {
@@ -1204,7 +1220,7 @@ window.addEventListener('resize', fit); window.addEventListener('orientationchan
 // ---------- overlays ----------
 function openOv(html, opt) {
   opt = opt || {};
-  stage.querySelectorAll('.banner').forEach(b => b.remove()); // a modal replaces any celebration banner
+  stage.querySelectorAll('.banner,.floater').forEach(b => b.remove()); if (!busy) czClose(true); // a modal replaces any celebration banner, floating text and the night cascade
   const o = document.createElement('div'); o.className = 'ov'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true');
   o.innerHTML = '<div class="sheet ' + (opt.cls || '') + '" style="' + (opt.w ? 'width:' + opt.w + 'px;' : '') + '">' + (opt.close !== false ? '<button class="ibtn x" type="button" data-close aria-label="Close">' + ic('close') + '</button>' : '') + html + '</div>';
   o.closable = opt.close !== false; o.onclose = opt.onclose || null;
@@ -2068,7 +2084,7 @@ function placeCoach() {
 function cardEl(id) { const c = st.hand.find((x, i) => x.id === id && C.canPlay(st, i)); return c && view.querySelector('.card[data-uid="' + c.uid + '"]'); }
 function coachUpdate() {
   removeCoach(); if (!st || st.phase !== 'play' || ov) return;
-  const tap = layout.port && touchMode ? 'Tap it twice' : 'Tap it';
+  const tap = !touchMode ? 'Click it' : layout.port ? 'Tap it twice' : 'Tap it';
   if (st.mode === 'tutorial') {
     const t = st.today, played = t.played;
     if (st.day === 1) {
