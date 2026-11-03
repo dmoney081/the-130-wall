@@ -1841,6 +1841,7 @@ async function playEvents(E) {
 // ---------- offers, win choice, pause ----------
 function showOffers() {
   if (ov && ov.dataset.kind === 'offers') closeOv(ov);
+  czClose(true); stage.querySelectorAll('.cascade').forEach(e => e.remove()); // the card pick replaces the night cascade (and any still fading out), even at the fastest speed
   const reward = st.phase === 'reward', s = st;
   const title = reward ? (s.overtime && s.billsPaid > 5 ? 'Overtime bill paid! Pick an upgrade' : 'Bill paid! Pick an upgrade') : 'Mid-cycle draft: add a card';
   const tutPick = st.mode === 'tutorial' && !reward && st.day <= 3;
