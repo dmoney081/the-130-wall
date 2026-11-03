@@ -1225,13 +1225,30 @@ function openOv(html, opt) {
   o.innerHTML = '<div class="sheet ' + (opt.cls || '') + '" style="' + (opt.w ? 'width:' + opt.w + 'px;' : '') + '">' + (opt.close !== false ? '<button class="ibtn x" type="button" data-close aria-label="Close">' + ic('close') + '</button>' : '') + html + '</div>';
   o.closable = opt.close !== false; o.onclose = opt.onclose || null;
   stage.appendChild(o); ovStack.push(o); ov = o;
+  fitCards(o);
   o.addEventListener('click', e => { const t = e.target.closest('[data-close]'); if (t) { S.play('tap'); closeOv(o); } });
   setTimeout(() => { const f = o.querySelector('[autofocus],.btn.primary,.card:not(.off),.btn'); if (f && !touchMode) try { f.focus({ preventScroll: true }); } catch (_) {} }, 30);
   return o;
 }
 function closeOv(o) { o = o || ov; if (!o) return; o.remove(); ovStack = ovStack.filter(x => x !== o); ov = ovStack[ovStack.length - 1] || null; if (o.onclose) o.onclose(); }
 function closeAll() { while (ov) { const o = ov; o.onclose = null; closeOv(o); } }
-function toast(html, cls, ms) { const t = document.createElement('div'); t.className = 'banner show ' + (cls || ''); t.innerHTML = html; stage.appendChild(t); setTimeout(() => t.remove(), ms || 1000); return t; }
+function toast(html, cls, ms) { const t = document.createElement('div'); t.className = 'banner show ' + (cls || ''); t.innerHTML = html; const host = annClear() || stage; host.appendChild(t); annFit(t); setTimeout(() => t.remove(), ms || 1000); return t; }
+// announcements (banners, toasts, the night cascade) own the center panel during a game: one at a time, scaled to fit,
+// and the panel's own content (bot, bubble, forecast) is hidden underneath while one shows, so nothing overlaps
+function annClear() { const c = document.getElementById('g-center'); if (!c) return null; if (cz) { cz.el.remove(); cz = null; } c.querySelectorAll(':scope>.banner,:scope>.cascade').forEach(x => x.remove()); return c; }
+function annFit(el) { const c = el.parentNode; if (!c || c.id !== 'g-center') return; el.style.removeProperty('--fit'); const k = Math.min(1, (c.clientWidth - 4) / Math.max(1, el.offsetWidth), (c.clientHeight - 4) / Math.max(1, el.offsetHeight)); if (k < 1) el.style.setProperty('--fit', k.toFixed(3)); }
+function annWatch() { const c = $('g-center'); if (!c) return; const upd = () => c.classList.toggle('ann', !!c.querySelector(':scope>.banner,:scope>.cascade')); new MutationObserver(upd).observe(c, { childList: true }); upd(); }
+// in-place change badges: a stat, cash, energy or product change briefly replaces that element's own label line,
+// so the number appears right on the thing that changed and can never cover anything else
+const DL_SLOT = [['.stat', '.k'], ['#g-cashblk', '#g-earned'], ['.prod', '.pp'], ['#g-cpu', '.k']];
+function delta(el, html, cls) {
+  if (!el) return; let host = null, slot = null;
+  for (const [h, q] of DL_SLOT) { const x = el.closest(h); if (x) { host = x; slot = x.querySelector(q); break; } }
+  if (!host || !slot) return;
+  let d = slot.parentNode.querySelector(':scope>.delta'); if (!d) { d = document.createElement('span'); slot.after(d); }
+  d.className = 'delta ' + (cls || 'good'); d.innerHTML = html; host.classList.add('dl'); if (motionOK) { void d.offsetWidth; d.classList.add('in'); }
+  clearTimeout(host.__dl); host.__dl = setTimeout(() => { host.classList.remove('dl'); d.remove(); }, Math.max(450, 900 * (spd() || 0.5)));
+}
 
 // ---------- copy / share ----------
 function copyText(text) {
@@ -1519,6 +1536,7 @@ function buildGame() {
     '<div class="handwrap" id="g-handwrap"><div class="hand" id="g-hand"></div></div>' +
     '<div class="act"><div class="cpu" id="g-cpu" aria-label="Energy"></div><div class="deckinfo"><button type="button" id="g-deck">' + ic('card') + ' Deck <b id="g-deckn">0</b></button><button type="button" id="g-disc">' + ic('reroll') + ' Used <b id="g-discn">0</b></button></div><button type="button" class="btn primary end" id="g-end">End day</button></div>' +
     '</div>';
+  annWatch();
   $('g-pause').onclick = () => { S.play('tap'); openPause(); };
   ['g-skip', 'g-skip2'].forEach(id => { const b = $(id); if (b) b.onclick = () => { S.play('tap'); skipTutorial(); }; });
   $('g-mute').onclick = toggleMute;
@@ -1543,6 +1561,9 @@ function hoverCard(el) { const c = st && st.hand.find(x => String(x.uid) === el.
 function syncD() { D = { cash: st.cash, earned: st.earned, aud: st.aud, trust: st.trust, q: st.q, burnout: st.burnout, cpu: st.cpu, cpuMax: Math.max(st.cpu, D.cpuMax && D.day === st.day ? D.cpuMax : 0), day: st.day, products: st.products.map(p => p.uid) }; }
 function renderAll() { if (!st || !$('game')) return; syncD(); renderTop(); renderStats(); renderBiz(); renderFc(); renderCpu(); renderHand(); renderMood(); }
 function billInfo(day) { const cyc = C.cycleOf(day), amt = C.billAmt(st, cyc), due = C.billDue(st, day); return { cyc, amt, due, left: due - day }; }
+// big numbers in a fixed-width top chip (cash past $1,000 on a 360px phone): shrink the type so they stay inside the chip
+function fitW(el) { if (!el) return; el.style.fontSize = ''; const p = el.parentNode; if (!p || !p.clientWidth || p.scrollWidth <= p.clientWidth + 1) return;
+  const fs = parseFloat(getComputedStyle(el).fontSize); el.style.fontSize = Math.max(11, Math.floor(fs * p.clientWidth / p.scrollWidth * 0.96)) + 'px'; }
 function renderTop() {
   const day = st.day, b = billInfo(day);
   $('g-day').textContent = 'Day ' + day + (st.overtime ? '' : st.mode === 'tutorial' ? ' / ' + C.T.TUTDAYS : ' / ' + C.DAYS);
@@ -1551,6 +1572,7 @@ function renderTop() {
   $('g-billblk').classList.toggle('due', b.left === 0 && st.phase === 'play');
   const bar = $('g-billbar'); bar.firstChild.style.width = Math.min(100, 100 * D.cash / b.amt) + '%'; bar.classList.toggle('short', D.cash < b.amt);
   $('g-cash').textContent = money(D.cash); $('g-earned').textContent = layout.port ? 'Cash' : 'Cash · earned ' + money(D.earned);
+  fitW($('g-cash')); fitW($('g-bill')); fitW($('g-day'));
   renderGhost();
   S.setIntensity(rush || (b.left === 0 && st.phase === 'play') ? 1 : 0);
 }
@@ -1573,12 +1595,15 @@ function renderStats() {
 }
 function renderBiz(newUid) {
   const el = $('g-prods');
-  el.classList.toggle('many', st.products.length > 4); el.parentNode.classList.toggle('many', st.products.length > 4);
+  const many = st.products.length > (layout.port || layout.short ? 4 : 2); // desktop: compact two-column list from 3 products so it never scrolls under the tool slots
+  el.classList.toggle('many', many); el.parentNode.classList.toggle('many', many);
   el.innerHTML = st.products.length ? st.products.map((p, i) => '<div class="prod' + (p.uid === newUid ? ' new' : '') + '" data-i="' + i + '" id="p-' + p.uid + '" title="' + esc(p.n) + '">' + ic(p.kind === 'clone' ? 'copy' : 'prod') + '<span class="pn">' + esc(p.n) + '</span><span class="pp">' + money(C.priceOf(st, p)) + '</span></div>').join('') : '<div class="prod empty">No products yet</div>';
   const t = $('g-tools'); let h = st.tools.map(id => '<button type="button" class="toolb' + (A.pic(id) ? ' hp' : '') + '" data-tool="' + id + '" aria-label="' + esc(C.TOOLS[id].n + ': ' + C.TOOLS[id].d) + '" title="' + esc(C.TOOLS[id].n + ': ' + C.TOOLS[id].d) + '">' + A.pic(id) + ic(A.TOOL_ICON[id] || 'tool') + '</button>').join('');
   for (let i = st.tools.length; i < C.MAX_TOOLS; i++) h += '<span class="toolb emptyt" aria-hidden="true"></span>';
   t.innerHTML = h; t.classList.toggle('many', st.tools.length > 2); t.classList.toggle('none', !st.tools.length);
+  if (layout.port) { const bh = el.parentNode.offsetHeight; if (bh !== bizH) { const was = bizH; bizH = bh; if (was) renderHand(); } }
 }
+let bizH = 0;
 const xsF = x => (Math.round(x * 100) / 100) + '';
 function renderFc() {
   const f = C.forecast(st), el = $('g-fc');
@@ -1598,12 +1623,15 @@ function renderCpu() {
 function cardStyle() {
   const n = Math.max(1, st.hand.length);
   if (layout.port) {
-    const W = layout.W - 16, cw = Math.floor((W - 21) / 4), ch = clamp(Math.floor((layout.H - 398) / 2), 104, 168);
+    // two rows of cards get whatever height is left after the fixed rows (measured: the business panel grows with tools and
+    // products) and room for the center panel, so on short phones the hand never crushes the bubble and forecast
+    const bz = document.querySelector('#game .biz'), dBiz = bz ? Math.max(0, bz.offsetHeight - 64) : 0;
+    const W = layout.W - 16, cw = Math.floor((W - 21) / 4), ch = clamp(Math.floor((layout.H - 456 - dBiz) / 2), 96, 168);
     return { cw, ch, ah: Math.round(ch * (ch < 130 ? 0.22 : 0.27)), nf: 12, ff: 12, ml: 0, rows: ch * 2 + 9, small: ch < 140 };
   }
   const wrap = $('g-handwrap'); const avail = (wrap ? wrap.clientWidth : layout.W - 260) - 8, hh = layout.short ? 150 : 182;
   let cw = Math.min(128, Math.floor((avail - 8 * (n - 1)) / n)), ml = 8;
-  if (cw < 108) { cw = 108; ml = Math.floor((avail - n * cw) / Math.max(1, n - 1)); }
+  if (cw < 92) { cw = 92; ml = Math.floor((avail - n * cw) / Math.max(1, n - 1)); }
   return { cw, ch: Math.min(hh, Math.round(cw * 1.44)), ah: Math.round(Math.min(hh, cw * 1.44) * .3), nf: cw < 118 ? 13 : 14, ff: cw < 118 ? 12 : 13, ml, small: false };
 }
 function renderHand() {
@@ -1620,10 +1648,16 @@ function renderHand() {
     return cardHTML(c, { uid: c.uid, live: 1, cost: C.costOf(st, c, i), off: off === 'phase' ? '' : off, deal: isNew && motionOK, sel: selected === c.uid, style: style + (cs.small ? '' : '') });
   }).join('');
   el.classList.toggle('small', !!cs.small);
+  // a long effect line on a short card: tighten the type, then drop the tag line, so nothing hangs below the card's border
+  fitCards(el);
   if (!st.hand.length && !layout.port && st.phase !== 'over') el.innerHTML = runStrip();
 }
 // Upgrade 2: when the hand is empty on desktop, the lower board shows this run (revenue per day vs the bill pace)
 // and what was played today, instead of a blank strip. Not a .card, never focusable, so tests and the coach ignore it.
+function fitCards(root) {
+  const go = () => { for (const c of root.querySelectorAll('.card')) { if (!c.clientHeight) continue; if (c.scrollHeight > c.clientHeight + 1) c.classList.add('tight'); if (c.scrollHeight > c.clientHeight + 1) c.classList.add('notag'); } };
+  go(); requestAnimationFrame(go); // again after layout settles (fonts, a panel that resized this frame)
+}
 function runStrip() {
   const b = billInfo(st.day), len = st.mode === 'tutorial' ? C.T.TUTDAYS : C.CYCLE, pace = b.amt / len;
   const days = st.days.slice(-25), top = Math.max(pace * 1.25, 1, ...days.map(d => d.rev));
@@ -1704,7 +1738,7 @@ const STAT_KEY = { aud: 'aud', trust: 'trust', q: 'q', burn: 'burnout', cash: 'c
 const SRC_NAME = { tipjar: 'Tip jar', stickers: 'Stickers', changelog: 'Changelog', autopost: 'Auto-poster', seo: 'SEO', mailing: 'Mailing list', discord: 'Community', duck: 'Rubber duck', wom: 'word of mouth', savings: 'interest', ghost: 'Ghostwriter', viral: 'viral', night: 'night shift', sponsor: 'sponsor', bundle: 'bundle', tip: 'tip', bounty: 'bounty' };
 function banner(title, sub, cls, ms) {
   const el = document.createElement('div'); el.className = 'banner show ' + (cls || ''); el.innerHTML = '<div class="bt">' + title + '</div>' + (sub ? '<div class="bs">' + sub + '</div>' : '');
-  const host = $('g-center') || stage; host.querySelectorAll('.banner').forEach(b => b.remove()); host.appendChild(el); setTimeout(() => el.remove(), Math.max(700, (ms || 1000) * (spd() || 0.5)));
+  const host = annClear() || stage; host.appendChild(el); annFit(el); el.addEventListener('animationend', e => { if (e.target === el) el.remove(); }); setTimeout(() => el.remove(), Math.max(700, (ms || 1000) * (spd() || 0.5)));
 }
 // ---------- the night sales cascade (Balatro-style: each factor pops in turn, then the money rolls up) ----------
 let cz = null;
@@ -1712,7 +1746,7 @@ function czClose(now) { const el = cz && cz.el; cz = null; if (!el) return; if (
 function czMs(ms) { const k = spd(); return !k || fast ? 0 : ms * k; }
 function czPop(el) { if (!el) return; el.classList.add('on'); if (motionOK) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); } }
 async function czOpen(e) {
-  czClose(true); const host = $('g-center'); if (!host) return;
+  czClose(true); const host = annClear(); if (!host) return;
   const nP = e.nP != null ? e.nP : st.products.length, xs = e.xsell || 1;
   const el = document.createElement('div'); el.className = 'cascade'; el.setAttribute('aria-hidden', 'true');
   el.innerHTML = '<div class="cz-row">' +
@@ -1723,7 +1757,7 @@ async function czOpen(e) {
     '<span class="cz-chip buy" data-z="buy"><span class="cz-op">=</span> <b>' + e.buyers + '</b> <small>' + (e.buyers === 1 ? 'buyer' : 'buyers') + '</small></span></div>' +
     '<div class="cz-total"><span class="cz-cash">+$<b class="v">0</b></span></div>' +
     (nP ? '' : '<div class="cz-note">No products to buy. Ship one!</div>');
-  host.appendChild(el); cz = { el, total: 0, shown: 0 };
+  host.appendChild(el); cz = { el, total: 0, shown: 0 }; el.classList.add('pre'); annFit(el); el.classList.remove('pre');
   const q = z => el.querySelector('[data-z="' + z + '"]');
   czPop(q('vis')); S.play('tick', { pitch: 0.9 }); X.count(q('vis').querySelector('.v'), 0, e.visitors, czMs(320), v => String(v));
   await wait(330);
@@ -1738,10 +1772,10 @@ function czSale(amt) {
   X.count(v, from, cz.total, czMs(220), x => String(x)); const t = cz.el.querySelector('.cz-total'); t.classList.add('on'); czPop(t);
 }
 async function czSlam(rev) {
-  if (!cz) return; const t = cz.el.querySelector('.cz-total'); t.querySelector('.v').textContent = String(rev); t.classList.add('on', 'slam');
+  if (!cz) return; const t = cz.el.querySelector('.cz-total'); t.querySelector('.v').textContent = String(rev); t.classList.add('on', 'slam'); annFit(cz.el);
   const bill = billInfo(st.day).amt, prev = st.days.slice(0, -1).reduce((m, d) => Math.max(m, d.rev || 0), 0);
   const big = rev >= bill * 0.4 || (rev >= 20 && rev > prev);
-  if (big) { t.classList.add('big'); S.play('bigcoin'); X.shake(rev >= bill); X.confetti(rev >= bill ? 90 : 45); X.burst(t, ['#ffcf4a', '#fff3b0', '#c6ff3d'], 26, 'conf'); }
+  if (big) { t.classList.add('big'); annFit(cz.el); S.play('bigcoin'); X.shake(rev >= bill); X.confetti(rev >= bill ? 90 : 45); X.burst(t, ['#ffcf4a', '#fff3b0', '#c6ff3d'], 26, 'conf'); }
   await wait(big ? 520 : 300);
 }
 async function playEvents(E) {
@@ -1761,14 +1795,14 @@ async function playEvents(E) {
       }
       case 'stat': {
         const k = STAT_KEY[e.k], el = $(STAT_EL[e.k]);
-        if (e.k === 'cpu') { D.cpu = e.d === 0 ? 0 : D.cpu + e.d; D.cpuMax = Math.max(D.cpuMax, D.cpu); renderCpu(); if (e.d) { X.float(el, '+' + e.d + ' ' + ic('cpu'), 'good'); S.play('stat', { pitch: 1.2 }); } await wait(160); break; }
+        if (e.k === 'cpu') { D.cpu = e.d === 0 ? 0 : D.cpu + e.d; D.cpuMax = Math.max(D.cpuMax, D.cpu); renderCpu(); if (e.d) { delta(el, '+' + e.d + ' energy', 'good'); S.play('stat', { pitch: 1.2 }); } await wait(160); break; }
         let d = e.d;
         if (e.k === 'cash' && e.src === 'sales') { await czSlam(e.d); d -= salesShown; salesShown = 0; }
         D[k] = Math.max(0, D[k] + d); if (e.k === 'cash' && e.d > 0) D.earned += d;
         if (d) {
           const bad = e.k === 'burn' ? d > 0 : d < 0;
-          const txt = (d > 0 ? '+' : '−') + (e.k === 'cash' ? '$' : '') + Math.abs(d) + (e.k === 'cash' ? '' : ' ' + ic(e.k === 'burn' ? 'burn' : e.k)) + (e.src && SRC_NAME[e.src] ? ' <small>' + SRC_NAME[e.src] + '</small>' : '');
-          X.float(el, txt, e.k === 'cash' && !bad ? 'gold' : bad ? 'bad' : 'good');
+          const txt = (d > 0 ? '+' : '−') + (e.k === 'cash' ? '$' : '') + Math.abs(d) + (e.src && SRC_NAME[e.src] ? ' <small>' + SRC_NAME[e.src] + '</small>' : '');
+          delta(el, txt, e.k === 'cash' && !bad ? 'gold' : bad ? 'bad' : 'good');
           X.pulse(el, bad ? 'pulse-bad' : 'pulse');
           S.play(e.k === 'cash' ? (bad ? 'bad' : 'coin') : bad ? 'bad' : 'stat', { pitch: bad ? 0.8 : 1 + Math.min(0.6, Math.abs(d) / 60) });
         }
@@ -1778,9 +1812,9 @@ async function playEvents(E) {
       case 'draw': S.play('draw', { vol: 0.6 }); await wait(fast ? 0 : 40); break;
       case 'shuffle': say(ic('reroll') + ' Deck empty: used cards shuffled back in.', 'say'); S.play('whoosh'); await wait(320); break;
       case 'combo': banner(esc(e.n), esc(e.sub), e.big ? 'gold' : '', e.big ? 1300 : 1000); S.play('combo', { pitch: e.big ? 1.15 : 1 }); X.burst($('g-bot'), ['#c6ff3d', '#ffcf4a', '#3de0ff'], e.big ? 40 : 22, 'conf'); if (e.big) { X.confetti(70); X.shake(false); } renderMood('wow'); await wait(e.big ? 1000 : 720); break;
-      case 'product': renderBiz(e.p.uid); const pe = $('p-' + e.p.uid); X.float(pe || $('g-prods'), '+1 ' + ic('prod') + ' ' + esc(e.p.n), 'good'); X.burst(pe || $('g-prods'), '#c6ff3d', 16); S.play('level'); renderFc(); await wait(380); break;
-      case 'upgrade': renderBiz(); X.pulse($('p-' + e.p.uid)); X.float($('p-' + e.p.uid) || $('g-prods'), '+$1', 'gold'); S.play('level'); await wait(300); break;
-      case 'price': renderBiz(); X.pulse($('g-prods')); X.float($('g-prods'), '+$1 prices', 'gold'); S.play('coin'); await wait(300); break;
+      case 'product': renderBiz(e.p.uid); const pe = $('p-' + e.p.uid); delta(pe, 'new!', 'good'); X.burst(pe || $('g-prods'), '#c6ff3d', 16); S.play('level'); renderFc(); await wait(380); break;
+      case 'upgrade': renderBiz(); X.pulse($('p-' + e.p.uid)); delta($('p-' + e.p.uid), '+$1', 'gold'); S.play('level'); await wait(300); break;
+      case 'price': renderBiz(); X.pulse($('g-prods')); $('g-prods').querySelectorAll('.prod').forEach(x => delta(x, '+$1', 'gold')); S.play('coin'); await wait(300); break;
       case 'curse': say(ic('curse') + ' <b>' + esc(C.CARDS[e.id].n) + '</b> added to your deck. ' + esc(C.CARDS[e.id].fx.replace(/\{\w+\}/g, '')), 'bad'); S.play('bad'); X.pulse($('g-deck'), 'pulse-bad'); hintOnce('curse', 'Curses hurt if you still hold them at the end of the day. Play them to clear them.'); await wait(420); break;
       case 'msg': say(esc(e.m), 'say'); await wait(520); break;
       case 'held': { const el = view.querySelector('.card[data-uid="' + e.c.uid + '"]'); if (el) { el.classList.remove('nope'); void el.offsetWidth; el.classList.add('nope'); } say(ic('curse') + ' You held <b>' + esc(C.CARDS[e.c.id].n) + '</b>. It bites.', 'bad'); S.play('bad'); await wait(380); break; }
@@ -1794,13 +1828,13 @@ async function playEvents(E) {
       case 'sale': {
         const pe = $('g-prods').querySelector('[data-i="' + e.i + '"]');
         D.cash += e.amt; D.earned += e.amt; salesShown += e.amt; saleN++;
-        X.float(pe, '+$' + e.amt + (e.n > 1 ? ' <small>' + e.n + '×$' + e.price + '</small>' : ''), 'gold');
+        delta(pe, '+$' + e.amt, 'gold');
         X.coins(pe, $('g-cash'), Math.min(8, e.n + 1), () => { X.pulse($('g-cashblk')); });
         S.play('coin', { pitch: 1 + Math.min(0.8, saleN * 0.07) }); czSale(e.amt);
         renderTop(); await wait(170); break;
       }
       case 'firstsale': czClose(); banner('FIRST SALE!', 'A real stranger paid real money.', 'gold', 1300); S.play('bigcoin'); X.confetti(80); renderMood('money'); await wait(1000); break;
-      case 'fade': D.aud = Math.max(0, D.aud + e.d); X.float($('s-aud'), e.d + ' ' + ic('aud') + ' <small>fade</small>', 'dim'); renderStats(); await wait(160); break;
+      case 'fade': D.aud = Math.max(0, D.aud + e.d); delta($('s-aud'), '−' + Math.abs(e.d) + ' <small>fade</small>', 'dim'); renderStats(); await wait(160); break;
       case 'takedown': say(ic('copy') + ' <b>' + esc(e.p.n) + '</b> got a takedown notice. Gone.', 'bad'); renderBiz(); S.play('bad'); X.shake(false); await wait(560); break;
       case 'event': say((e.good ? ic('star2') : ic('bug')) + ' ' + esc(e.m), e.good ? 'good' : 'bad'); S.play(e.good ? 'event' : 'bad'); renderMood(e.good ? 'happy' : 'worried'); if (!e.good) X.shake(false); await wait(950); break;
       case 'burnout': banner('BURNOUT', 'You crash. No energy tomorrow.', 'bad', 1300); S.play('unplug', { pitch: 1.4 }); X.shake(true); renderMood('sleepy'); await wait(1100); break;
@@ -1810,7 +1844,7 @@ async function playEvents(E) {
         if (e.paid) {
           D.cash = Math.max(0, D.cash - e.amt); renderTop();
           banner('BILL ' + e.cyc + ' PAID', '−' + money(e.amt) + ' · lights stay on', 'gold', 1500);
-          X.float($('g-cashblk'), '−' + money(e.amt), 'bad'); S.play('paid'); X.confetti(60); renderMood('happy'); PF.hook('happy');
+          delta($('g-cashblk'), '−' + money(e.amt) + ' <small>bill</small>', 'bad'); S.play('paid'); X.confetti(60); renderMood('happy'); PF.hook('happy');
           await wait(1400);
         } else {
           banner('UNPLUGGED', 'Short ' + money(e.short) + ' on a ' + money(e.amt) + ' bill', 'bad', 1800);
