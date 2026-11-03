@@ -1604,6 +1604,19 @@ function renderHand() {
     return cardHTML(c, { uid: c.uid, live: 1, cost: C.costOf(st, c, i), off: off === 'phase' ? '' : off, deal: isNew && motionOK, sel: selected === c.uid, style: style + (cs.small ? '' : '') });
   }).join('');
   el.classList.toggle('small', !!cs.small);
+  if (!st.hand.length && !layout.port && st.phase !== 'over') el.innerHTML = runStrip();
+}
+// Upgrade 2: when the hand is empty on desktop, the lower board shows this run (revenue per day vs the bill pace)
+// and what was played today, instead of a blank strip. Not a .card, never focusable, so tests and the coach ignore it.
+function runStrip() {
+  const b = billInfo(st.day), len = st.mode === 'tutorial' ? C.T.TUTDAYS : C.CYCLE, pace = b.amt / len;
+  const days = st.days.slice(-25), top = Math.max(pace * 1.25, 1, ...days.map(d => d.rev));
+  const first = st.days.length - days.length, cyc0 = (b.cyc - 1) * len;
+  const bars = days.map((d, i) => '<i class="rb' + (first + i + 1 > cyc0 ? ' cur' : '') + (d.rev >= pace ? ' ok' : '') + '" style="height:' + Math.max(3, Math.round(d.rev / top * 100)) + '%" title="Day ' + (first + i + 1) + ': ' + money(d.rev) + '"></i>').join('');
+  const played = st.today.played.map(id => { const c = C.CARDS[id]; return '<span class="rp" style="--c:var(--' + c.tag + ')">' + A.pic(id) + esc(c.n) + '</span>'; }).join('');
+  return '<div class="runstrip" aria-hidden="true"><div class="rs-chart"><div class="rs-h">This run <b>' + money(st.days.reduce((t, d) => t + d.rev, 0)) + '</b> earned<span class="rs-pace">' + money(Math.ceil(pace)) + '/day pays the bill</span></div>' +
+    '<div class="rs-bars">' + (bars || '<span class="rs-none">Sales show up here each night.</span>') + '<i class="rs-line" style="bottom:' + Math.round(pace / top * 100) + '%"></i></div></div>' +
+    '<div class="rs-today"><div class="rs-h">Played today</div><div class="rs-list">' + (played || '<span class="rs-none">Nothing yet.</span>') + '</div></div></div>';
 }
 function renderMood(m) {
   const bot = $('g-bot'); if (!bot) return;
