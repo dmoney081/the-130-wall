@@ -1617,6 +1617,10 @@ function renderStats() {
   $('s-burn').classList.toggle('hot', D.burnout >= 6);
   if (layout.port) ['k-aud', 'k-trust', 'k-q', 'k-burn'].forEach(id => fitW($(id)));
 }
+function fitBiz() { const el = $('g-prods'), t = $('g-tools'); if (!el) return; const bz = el.parentNode; bz.classList.remove('dense', 'dense2', 'stackt'); if (!layout.port) return;
+  const nt = st.tools.length; t.dataset.more = nt > 1 ? '+' + (nt - 1) : '';
+  const wraps = () => { const tp = [...el.children, ...t.children].filter(k => k.offsetParent && k.offsetHeight).map(k => k.getBoundingClientRect().top); return tp.length > 1 && Math.max(...tp) - Math.min(...tp) > 4; };
+  if (wraps()) bz.classList.add('dense'); if (wraps() && nt > 1) bz.classList.add('stackt'); if (wraps()) bz.classList.add('dense2'); }
 function renderBiz(newUid) {
   const el = $('g-prods');
   const many = st.products.length > (layout.port ? 99 : layout.short ? 4 : 2); // desktop: compact two-column list from 3 products so it never scrolls under the tool slots
@@ -1631,6 +1635,7 @@ function renderBiz(newUid) {
   else { bz.removeAttribute('role'); bz.removeAttribute('tabindex'); bz.removeAttribute('aria-label'); }
   if (layout.port) { let m = bz.querySelector('.bizmore'); if (!m) { m = document.createElement('span'); m.className = 'bizmore'; m.setAttribute('aria-hidden', 'true'); bz.appendChild(m); }
     m.textContent = '›'; }
+  fitBiz();
   el.classList.remove('one', 'tok'); if (!layout.port) { el.removeAttribute('role'); el.removeAttribute('tabindex'); el.removeAttribute('aria-label'); }
   if (layout.phl && st.products.length) { el.classList.add('one');   // phone sideways: whole names in one column, else price tokens that open the sheet
     if (bz.scrollHeight > bz.clientHeight + 1) { el.classList.remove('one'); el.classList.add('tok'); el.setAttribute('role', 'button'); el.tabIndex = 0; el.setAttribute('aria-label', 'Your products: ' + st.products.length + '. Tap for names and prices'); } }
@@ -1696,7 +1701,7 @@ function renderHand() {
   // a long effect line on a short card: tighten the type, then drop the tag line, so nothing hangs below the card's border
   fitCards(el);
   if (!st.hand.length && st.phase !== 'over') { el.innerHTML = runStrip(); if (layout.port) el.firstChild.style.height = cs.rows + 'px'; }   // phones too: the night hand area shows the run, not a hole
-  if (centerFit) centerFit();   // same frame as the new hand: the center never spills onto it, even for one frame
+  if (centerFit) centerFit(); fitBiz();   // same frame as the new hand: the center never spills onto it, even for one frame
 }
 // Upgrade 2: when the hand is empty on desktop, the lower board shows this run (revenue per day vs the bill pace)
 // and what was played today, instead of a blank strip. Not a .card, never focusable, so tests and the coach ignore it.

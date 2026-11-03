@@ -650,13 +650,13 @@ input[type=range]{min-height:50px}
 /* phones: up to three offers sit side by side like a hand, not two plus an orphan */
 .port .offers:not(:has(>.offer:nth-child(4))){flex-wrap:nowrap;gap:8px}
 .port .offers:not(:has(>.offer:nth-child(4)))>.offer{flex:1 1 0;min-width:0;max-width:150px}
-.port .offers:not(:has(>.offer:nth-child(4))) .card.big,.port .offers:not(:has(>.offer:nth-child(4))) .toolcard{--cw:100%;--ch:186px;--ah:62px;--nf:14px;--ff:12.5px;width:100%;height:186px}
+.port .offers:not(:has(>.offer:nth-child(4))) .card.big,.port .offers:not(:has(>.offer:nth-child(4))) .toolcard{--cw:100%;--ch:186px;--ah:56px;--nf:14px;--ff:12.5px;width:100%;height:186px}
 /* phone held sideways: whole product names in one column when they fit */
 .phl .prods.one{display:flex;flex-direction:column;flex-wrap:nowrap}
 .phl .prods.one .prod{flex:none;width:100%;min-height:26px}
 .phl .prods.one .prod .pn{overflow:visible;text-overflow:clip}
 /* ...and when that does not fit, price tokens; tapping them opens the business sheet with every full name */
-.phl .prods.tok{display:flex;flex-direction:row;flex-wrap:wrap;align-content:center;gap:4px;min-height:44px;cursor:pointer;border-radius:10px}
+.phl .prods.tok{display:flex;flex-direction:row;flex-wrap:wrap;align-content:center;gap:4px;min-height:50px;cursor:pointer;border-radius:10px}
 .phl .prods.tok .prod{flex:none;width:auto;min-height:24px;padding:2px 8px 2px 6px;gap:4px}
 .phl .prods.tok .prod .pn{display:none}
 .phl .prods.tok .prod svg{display:inline-block}
@@ -673,3 +673,24 @@ input[type=range]{min-height:50px}
 .port .hand{padding-top:12px}
 .port .billblk.nolbl .row{grid-template-areas:"d d" "b b"}.port .billblk.nolbl .row>.sub:first-child{display:none}
 .port .runstrip{overflow:hidden}.port .rs-chart{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}.port .rs-bars{flex:1 1 auto;min-height:22px}
+.port .hub{grid-template-rows:1fr auto}
+.port .hub-r{justify-content:flex-end}
+.port .hub-l{container-type:size;min-height:0}
+@container (min-height:300px){.port .hub .logo{font-size:min(50px,12cqw)}.port .hub .botwrap{width:128px;height:110px}.port .hub-l{gap:12px}}
+@container (min-height:360px){.port .hub .logo{font-size:min(56px,12.5cqw)}.port .hub .botwrap{width:150px;height:128px}}
+.port .hub .logo{white-space:nowrap}
+.port .hub .lvlbox{width:100%;max-width:none;align-self:stretch}
+.port .hub .logo,.port .hub .lvlbox{margin-top:auto}
+/* phones: a crowded business strip stays one row - tighter price chips, then the tools fold to one icon + count */
+.port .biz.dense{gap:4px}
+.port .biz.dense .prods{gap:4px}
+.port .biz.dense .prod{padding:2px 6px;gap:2px}
+.port .biz.dense .prod .ic{font-size:12px}
+.port .biz.stackt .toolb:not(:first-child){display:none}
+.port .biz.stackt .tools::after{content:attr(data-more);font-weight:800;font-size:13px;color:var(--muted);align-self:center}
+.port .sheet:has(.bizsheet){width:calc(100% - 24px);max-width:420px;box-sizing:border-box}
+.port .sheet:has(.bizsheet) h2{padding-right:50px;white-space:nowrap}
+.port .biz{flex-wrap:nowrap}
+.port .biz .prods{flex:1 1 auto}
+.port .biz.dense2 .prod .ic{display:none}
+.port .biz.dense2 .prod{padding:2px 7px}
