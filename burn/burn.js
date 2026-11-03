@@ -526,7 +526,7 @@ function rankOf(score) { let r = RANKS[0][1]; RANKS.forEach(x => { if (score >= 
 function dailySeed(ymd) { return hash('burnrate2-daily-' + ymd); }
 
 const Core = {
-  T, FULL, DAYS, CYCLE, MAX_DAY, MAX_TOOLS, BILLS, TAGS, CARDS, TOOLS, FOUNDERS, BURNS, EVENTS, STARTER, RANKS,
+  T, FULL, DAYS, CYCLE, MAX_DAY, MAX_PRODUCTS, MAX_TOOLS, BILLS, TAGS, CARDS, TOOLS, FOUNDERS, BURNS, EVENTS, STARTER, RANKS,
   hash, stream, newRun, act, legal, canPlay, costOf, whyNot, priceOf, forecast, conv, billAmt, cycleOf, billDue, allCards, checkoutBroken,
   encodeAction, decodeAction, b64, unb64, code, parseCode, replay, verify, rankOf, dailySeed,
   clone: s => JSON.parse(JSON.stringify(s)),
@@ -1201,19 +1201,22 @@ function wait(ms) { const k = spd(); if (!k) return Promise.resolve(); return sl
 
 // ---------- layout: one fixed stage scaled to fit ----------
 function fit() {
-  const app = $('app'); const vw = app.clientWidth || innerWidth, vh = app.clientHeight || innerHeight;
+  const app = $('app'), acs = getComputedStyle(app), pl = parseFloat(acs.paddingLeft) || 0, pr = parseFloat(acs.paddingRight) || 0, pt = parseFloat(acs.paddingTop) || 0, pb = parseFloat(acs.paddingBottom) || 0;
+  const vw = (app.clientWidth || innerWidth) - pl - pr, vh = (app.clientHeight || innerHeight) - pt - pb;   // phones: fit inside the notch / home-bar safe area
   const port = vh > vw * 1.1; let W, H;
   if (port) { W = clamp(Math.round(vw), 360, 440); H = clamp(Math.round(vh * W / vw), 640, 940); }
   else { H = Math.max(440, Math.min(540, Math.round(vh))); W = Math.round(H * vw / vh); if (W < 900) { W = 900; H = Math.min(660, Math.max(440, Math.round(W * vh / vw))); } if (W > 1200) W = 1200; }
   const k = Math.min(vw / W, vh / H);
   const short = !port && H < 520;
-  const changed = port !== layout.port || W !== layout.W || H !== layout.H;
-  layout = { port, short, W, H, k };
+  const changed = port !== layout.port || W !== layout.W || H !== layout.H || (short && vw < 1000 && vh < 500) !== !!layout.phl;
+  const phl = short && vw < 1000 && vh < 500;
+  layout = { port, short, phl, W, H, k };
   stage.style.width = W + 'px'; stage.style.height = H + 'px';
-  stage.style.transform = 'translate(' + Math.round((vw - W * k) / 2) + 'px,' + Math.round((vh - H * k) / 2) + 'px) scale(' + k + ')';
+  stage.style.transform = 'translate(' + Math.round(pl + (vw - W * k) / 2) + 'px,' + Math.round(pt + (vh - H * k) / 2) + 'px) scale(' + k + ')';
   stage.classList.toggle('port', port); stage.classList.toggle('short', short);
+  stage.classList.toggle('phl', phl);   // a phone held sideways (844x390): fixes that never touch desktop
   X.setScale(k, W, H);
-  if (changed && st && $('g-hand')) { renderHand(); placeCoach(); }
+  if (changed && st && $('g-hand')) { if (D.day) { renderTop(); renderStats(); renderBiz(); } renderHand(); placeCoach(); }
 }
 window.addEventListener('resize', fit); window.addEventListener('orientationchange', () => setTimeout(fit, 120));
 
@@ -1237,7 +1240,16 @@ function toast(html, cls, ms) { const t = document.createElement('div'); t.class
 // and the panel's own content (bot, bubble, forecast) is hidden underneath while one shows, so nothing overlaps
 function annClear() { const c = document.getElementById('g-center'); if (!c) return null; if (cz) { cz.el.remove(); cz = null; } c.querySelectorAll(':scope>.banner,:scope>.cascade').forEach(x => x.remove()); return c; }
 function annFit(el) { const c = el.parentNode; if (!c || c.id !== 'g-center') return; el.style.removeProperty('--fit'); const k = Math.min(1, (c.clientWidth - 4) / Math.max(1, el.offsetWidth), (c.clientHeight - 4) / Math.max(1, el.offsetHeight)); if (k < 1) el.style.setProperty('--fit', k.toFixed(3)); }
-function annWatch() { const c = $('g-center'); if (!c) return; const upd = () => c.classList.toggle('ann', !!c.querySelector(':scope>.banner,:scope>.cascade')); new MutationObserver(upd).observe(c, { childList: true }); upd(); }
+let centerFit = null;
+function annWatch() { const c = $('g-center'); if (!c) return; const upd = () => { c.classList.toggle('ann', !!c.querySelector(':scope>.banner,:scope>.cascade')); if (coachEl) placeCoach(); }; new MutationObserver(upd).observe(c, { childList: true }); upd();
+  // phones: a tall center (one row of cards) stacks the bot over a bigger bubble and forecast instead of leaving bands of empty space
+  // phones: the center takes whatever the hand leaves. Big (roomy) layout when it fits, the side-by-side one when not,
+  // and a tight one (no ghost line / next-buyer bar, smaller type) when even that would spill onto the cards.
+  const over = () => { const r = c.getBoundingClientRect(); return [...c.querySelectorAll(':scope>*, :scope>.col>*')].some(e => { if (!e.offsetParent) return false; const q = e.getBoundingClientRect(); return q.height > 0 && (q.top < r.top - 1 || q.bottom > r.bottom + 1); }); };
+  const roomy = () => { c.classList.remove('tight'); if (!layout.port) { c.classList.remove('roomy'); return; }
+    const h = c.clientHeight, on = c.classList.contains('roomy'); c.classList.toggle('roomy', on ? h >= 280 : h >= 300);
+    if (c.classList.contains('roomy') && over()) c.classList.remove('roomy'); if (over()) c.classList.add('tight'); };
+  let raf = 0; if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; roomy(); }); }); ro.observe(c); const col = c.querySelector('.col'); if (col) ro.observe(col); new MutationObserver(() => { const z = c.querySelector(':scope>.cascade,:scope>.banner'); if (z) ro.observe(z); }).observe(c, { childList: true }); } centerFit = roomy; roomy(); }   // next frame: never inside the observer's own loop
 // in-place change badges: a stat, cash, energy or product change briefly replaces that element's own label line,
 // so the number appears right on the thing that changed and can never cover anything else
 const DL_SLOT = [['.stat', '.k'], ['#g-cashblk', '#g-earned'], ['.prod', '.pp'], ['#g-cpu', '.k']];
@@ -1546,7 +1558,9 @@ function buildGame() {
   $('g-hand').addEventListener('click', onHandClick);
   $('g-hand').addEventListener('mouseover', e => { const c = e.target.closest('.card'); if (c && !busy && !touchMode) hoverCard(c); });
   $('g-hand').addEventListener('focusin', e => { const c = e.target.closest('.card'); if (c && !busy) hoverCard(c); });
-  $('g-tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b) { S.play('tap'); const t = C.TOOLS[b.dataset.tool]; say('<b>' + esc(t.n) + ':</b> ' + esc(t.d), 'say'); } });
+  const bz = $('game').querySelector('.biz'); bz.addEventListener('click', e => { if (layout.port || (layout.phl && e.target.closest('#g-prods.tok'))) { S.play('tap'); bizSheet(); } });
+  bz.addEventListener('keydown', e => { if ((layout.port || (layout.phl && e.target.id === 'g-prods' && e.target.classList.contains('tok'))) && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); bizSheet(); } });
+  $('g-tools').addEventListener('click', e => { const b = e.target.closest('[data-tool]'); if (b && !layout.port) { S.play('tap'); const t = C.TOOLS[b.dataset.tool]; say('<b>' + esc(t.n) + ':</b> ' + esc(t.d), 'say'); } });
   ['s-aud', 's-trust', 's-q', 's-burn'].forEach(id => $(id).addEventListener('click', () => { S.play('tap'); say(STAT_HELP[id](), 'say'); }));
 }
 const STAT_HELP = {
@@ -1564,15 +1578,24 @@ function billInfo(day) { const cyc = C.cycleOf(day), amt = C.billAmt(st, cyc), d
 // big numbers in a fixed-width top chip (cash past $1,000 on a 360px phone): shrink the type so they stay inside the chip
 function fitW(el) { if (!el) return; el.style.fontSize = ''; const p = el.parentNode; if (!p || !p.clientWidth || p.scrollWidth <= p.clientWidth + 1) return;
   const fs = parseFloat(getComputedStyle(el).fontSize); el.style.fontSize = Math.max(11, Math.floor(fs * p.clientWidth / p.scrollWidth * 0.96)) + 'px'; }
+// phones: 'in 3 days' sits beside the Bill label; on a narrow bar drop the 'in', then shrink, never clip
+function fitDue(b) { const d = $('g-due'), bb = $('g-billblk'); d.style.fontSize = ''; bb.classList.remove('nolbl'); const over = () => d.scrollWidth > d.clientWidth + 1;
+  if (!d.clientWidth || !over()) return; if (b.left > 0) d.textContent = b.left + (b.left === 1 ? ' day' : ' days'); if (!over()) return;
+  const fs = parseFloat(getComputedStyle(d).fontSize), f = Math.floor(fs * d.clientWidth / d.scrollWidth * 0.95);
+  if (f >= 10) { d.style.fontSize = f + 'px'; return; } bb.classList.add('nolbl'); }   // still too narrow: the countdown takes the label's place
 function renderTop() {
   const day = st.day, b = billInfo(day);
-  $('g-day').textContent = 'Day ' + day + (st.overtime ? '' : st.mode === 'tutorial' ? ' / ' + C.T.TUTDAYS : ' / ' + C.DAYS);
+  const tot = st.overtime ? '' : st.mode === 'tutorial' ? C.T.TUTDAYS : C.DAYS;
+  $('g-day').textContent = layout.port ? day + (tot ? '/' + tot : '') : 'Day ' + day + (tot ? ' / ' + tot : '');
+  $('g-mode').textContent = layout.port ? 'Day' : ctx.label;   // phones: the mode name lives on the pause sheet
+  $('g-billblk').querySelector('.sub').textContent = layout.port ? 'Bill' : 'Power bill';
   $('g-bill').textContent = money(b.amt);
-  $('g-due').textContent = b.left === 0 ? 'due TONIGHT' : layout.port ? 'in ' + b.left + (b.left === 1 ? ' day' : ' days') : 'due day ' + b.due + ' (' + b.left + (b.left === 1 ? ' day' : ' days') + ')';
+  $('g-due').textContent = b.left === 0 ? (layout.port ? 'tonight' : 'due TONIGHT') : layout.port ? 'in ' + b.left + (b.left === 1 ? ' day' : ' days') : 'due day ' + b.due + ' (' + b.left + (b.left === 1 ? ' day' : ' days') + ')';
   $('g-billblk').classList.toggle('due', b.left === 0 && st.phase === 'play');
   const bar = $('g-billbar'); bar.firstChild.style.width = Math.min(100, 100 * D.cash / b.amt) + '%'; bar.classList.toggle('short', D.cash < b.amt);
   $('g-cash').textContent = money(D.cash); $('g-earned').textContent = layout.port ? 'Cash' : 'Cash · earned ' + money(D.earned);
   fitW($('g-cash')); fitW($('g-bill')); fitW($('g-day'));
+  if (layout.port) fitDue(b);
   renderGhost();
   S.setIntensity(rush || (b.left === 0 && st.phase === 'play') ? 1 : 0);
 }
@@ -1587,23 +1610,41 @@ function renderGhost() {
 }
 function renderStats() {
   const f = C.forecast(st);
-  $('v-aud').textContent = D.aud; const pt = layout.port; $('k-aud').textContent = (pt ? '~' : 'Audience · ~') + f.visitors + (pt ? ' visits' : ' visit');
-  $('v-trust').textContent = D.trust; $('k-trust').textContent = 'Trust · ' + pct(f.conv) + ' buy'; $('m-trust').style.width = D.trust + '%';
+  $('v-aud').textContent = D.aud; const pt = layout.port || layout.phl; /* phones (either way up): short words that fit the chip */ $('k-aud').textContent = (pt ? '~' : 'Audience · ~') + f.visitors + (pt ? ' visits' : ' visit');
+  $('v-trust').textContent = D.trust; $('k-trust').textContent = (pt ? '' : 'Trust · ') + pct(f.conv) + ' buy'; $('m-trust').style.width = D.trust + '%';
   $('v-q').textContent = D.q; $('k-q').textContent = (pt ? '' : 'Quality · ') + (D.q >= 6 ? 'Featured' : '+$' + (Math.floor(D.q / 3)) + ' price'); $('m-q').style.width = (D.q * 10) + '%';
-  $('v-burn').textContent = D.burnout + '/10'; $('k-burn').textContent = D.burnout >= 6 ? (pt ? '−1 energy!' : 'Burnout · −1 energy!') : 'Burnout'; $('m-burn').style.width = (D.burnout * 10) + '%';
+  $('v-burn').textContent = D.burnout + '/10'; $('k-burn').textContent = D.burnout >= 6 ? (pt ? '−1 energy!' : 'Burnout · −1 energy!') : pt ? 'burnout' : 'Burnout'; $('m-burn').style.width = (D.burnout * 10) + '%';
   $('s-burn').classList.toggle('hot', D.burnout >= 6);
+  if (layout.port) ['k-aud', 'k-trust', 'k-q', 'k-burn'].forEach(id => fitW($(id)));
 }
 function renderBiz(newUid) {
   const el = $('g-prods');
-  const many = st.products.length > (layout.port || layout.short ? 4 : 2); // desktop: compact two-column list from 3 products so it never scrolls under the tool slots
+  const many = st.products.length > (layout.port ? 99 : layout.short ? 4 : 2); // desktop: compact two-column list from 3 products so it never scrolls under the tool slots
   el.classList.toggle('many', many); el.parentNode.classList.toggle('many', many);
   el.innerHTML = st.products.length ? st.products.map((p, i) => '<div class="prod' + (p.uid === newUid ? ' new' : '') + '" data-i="' + i + '" id="p-' + p.uid + '" title="' + esc(p.n) + '">' + ic(p.kind === 'clone' ? 'copy' : 'prod') + '<span class="pn">' + esc(p.n) + '</span><span class="pp">' + money(C.priceOf(st, p)) + '</span></div>').join('') : '<div class="prod empty">No products yet</div>';
-  const t = $('g-tools'); let h = st.tools.map(id => '<button type="button" class="toolb' + (A.pic(id) ? ' hp' : '') + '" data-tool="' + id + '" aria-label="' + esc(C.TOOLS[id].n + ': ' + C.TOOLS[id].d) + '" title="' + esc(C.TOOLS[id].n + ': ' + C.TOOLS[id].d) + '">' + A.pic(id) + ic(A.TOOL_ICON[id] || 'tool') + '</button>').join('');
+  // phones: tools are icons inside the one big business button (tap opens the sheet), so they are spans, not tiny buttons
+  const tg = layout.port ? 'span' : 'button';
+  const t = $('g-tools'); let h = st.tools.map(id => '<' + tg + (tg === 'button' ? ' type="button"' : '') + ' class="toolb' + (A.pic(id) ? ' hp' : '') + '" data-tool="' + id + '" aria-label="' + esc(C.TOOLS[id].n + ': ' + C.TOOLS[id].d) + '" title="' + esc(C.TOOLS[id].n + ': ' + C.TOOLS[id].d) + '">' + A.pic(id) + ic(A.TOOL_ICON[id] || 'tool') + '</' + tg + '>').join('');
   for (let i = st.tools.length; i < C.MAX_TOOLS; i++) h += '<span class="toolb emptyt" aria-hidden="true"></span>';
   t.innerHTML = h; t.classList.toggle('many', st.tools.length > 2); t.classList.toggle('none', !st.tools.length);
+  const bz = el.parentNode; if (layout.port) { bz.setAttribute('role', 'button'); bz.tabIndex = 0; bz.setAttribute('aria-label', 'Your business: ' + st.products.length + ' products, ' + st.tools.length + ' tools. Tap for details'); }
+  else { bz.removeAttribute('role'); bz.removeAttribute('tabindex'); bz.removeAttribute('aria-label'); }
+  if (layout.port) { let m = bz.querySelector('.bizmore'); if (!m) { m = document.createElement('span'); m.className = 'bizmore'; m.setAttribute('aria-hidden', 'true'); bz.appendChild(m); }
+    m.textContent = '›'; }
+  el.classList.remove('one', 'tok'); if (!layout.port) { el.removeAttribute('role'); el.removeAttribute('tabindex'); el.removeAttribute('aria-label'); }
+  if (layout.phl && st.products.length) { el.classList.add('one');   // phone sideways: whole names in one column, else price tokens that open the sheet
+    if (bz.scrollHeight > bz.clientHeight + 1) { el.classList.remove('one'); el.classList.add('tok'); el.setAttribute('role', 'button'); el.tabIndex = 0; el.setAttribute('aria-label', 'Your products: ' + st.products.length + '. Tap for names and prices'); } }
   if (layout.port) { const bh = el.parentNode.offsetHeight; if (bh !== bizH) { const was = bizH; bizH = bh; if (was) renderHand(); } }
 }
 let bizH = 0;
+// phones: the strip shows price tokens only; this sheet has every product's full name and price and every tool's text
+function bizSheet() {
+  if (!st || busy || ov) return;
+  const ps = st.products.length ? st.products.map(p => '<div class="bs-p">' + ic(p.kind === 'clone' ? 'copy' : 'prod', 'i-prod') + '<span class="bs-n">' + esc(p.n) + (p.kind === 'clone' ? ' <small>clone</small>' : '') + '</span><b class="num">' + money(C.priceOf(st, p)) + '</b></div>').join('') : '<p class="muted">No products yet. Ship one to start selling.</p>';
+  const ts = st.tools.length ? st.tools.map(id => '<div class="bs-t">' + '<span class="toolb bs-pic' + (A.pic(id) ? ' hp' : '') + '">' + A.pic(id) + ic(A.TOOL_ICON[id] || 'tool') + '</span>' + '<span><b>' + esc(C.TOOLS[id].n) + '</b><br><span class="muted">' + esc(C.TOOLS[id].d) + '</span></span></div>').join('') : '<p class="muted">No tools yet. Pick them after a day, they work every day.</p>';
+  const o = openOv('<h2>' + ic('prod') + ' Your business</h2><div class="bizsheet"><div class="lbl">Products · ' + st.products.length + '/' + C.MAX_PRODUCTS + '</div>' + ps + '<div class="lbl">Tools · ' + st.tools.length + '/' + C.MAX_TOOLS + '</div>' + ts + '</div><button type="button" class="btn primary" data-close style="width:100%;margin-top:10px">Back to the day</button>', { cls: 'bizsh' });
+  o.dataset.kind = 'biz';
+}
 const xsF = x => (Math.round(x * 100) / 100) + '';
 function renderFc() {
   const f = C.forecast(st), el = $('g-fc');
@@ -1625,9 +1666,13 @@ function cardStyle() {
   if (layout.port) {
     // two rows of cards get whatever height is left after the fixed rows (measured: the business panel grows with tools and
     // products) and room for the center panel, so on short phones the hand never crushes the bubble and forecast
-    const bz = document.querySelector('#game .biz'), dBiz = bz ? Math.max(0, bz.offsetHeight - 64) : 0;
-    const W = layout.W - 16, cw = Math.floor((W - 21) / 4), ch = clamp(Math.floor((layout.H - 456 - dBiz) / 2), 96, 168);
-    return { cw, ch, ah: Math.round(ch * (ch < 130 ? 0.22 : 0.27)), nf: 12, ff: 12, ml: 0, rows: ch * 2 + 9, small: ch < 140 };
+    const g = $('game'), hOf = q => { const e = g && g.querySelector(q); return e ? e.offsetHeight : 0; };
+    const fixed = (hOf('.top') || 56) + (hOf('.stats') || 46) + (hOf('.biz') || 44) + (hOf('.act') || 60);
+    const cols = n > 6 ? 4 : 3, W = layout.W - 16, gx = 8, gy = 10, cw = Math.floor((W - gx * (cols - 1)) / cols);
+    const cMin = clamp(Math.round(layout.H * 0.2), 128, 190);           // the bubble + forecast always keep this much
+    const ch = clamp(Math.min(Math.floor((layout.H - 16 - 5 * 8 - fixed - cMin - gy) / 2), Math.round(cw * (cols > 3 ? 1.7 : 1.45))), 100, 196);
+    const rows = st.hand.length ? Math.ceil(st.hand.length / cols) : 1;  // empty hand: one row for the run strip
+    return { cw, ch, ah: Math.round(ch * (ch < 130 ? 0.3 : 0.36)), nf: cw < 100 ? 13 : 14.5, ff: cw < 100 ? 12 : 13, ml: 0, rows: rows * ch + (rows - 1) * gy, small: ch < 124, cols };
   }
   const wrap = $('g-handwrap'); const avail = (wrap ? wrap.clientWidth : layout.W - 260) - 8, hh = layout.short ? 150 : 182;
   let cw = Math.min(128, Math.floor((avail - 8 * (n - 1)) / n)), ml = 8;
@@ -1644,13 +1689,14 @@ function renderHand() {
   el.innerHTML = st.hand.map((c, i) => {
     const isNew = !shownUids[c.uid]; shownUids[c.uid] = 1;
     const off = C.canPlay(st, i) ? '' : st.phase === 'play' ? C.whyNot(st, i) : 'phase';
-    const style = '--cw:' + cs.cw + 'px;--ch:' + cs.ch + 'px;--ah:' + cs.ah + 'px;--nf:' + cs.nf + 'px;--ff:' + cs.ff + 'px;' + (cs.ml < 0 && i > 0 ? 'margin-left:' + cs.ml + 'px;' : '') + (isNew && motionOK ? 'animation-delay:' + (k++ * 70) + 'ms;' : '') + (layout.port ? 'width:auto;height:' + cs.ch + 'px;' : '');
+    const style = '--cw:' + cs.cw + 'px;--ch:' + cs.ch + 'px;--ah:' + cs.ah + 'px;--nf:' + cs.nf + 'px;--ff:' + cs.ff + 'px;' + (cs.ml < 0 && i > 0 ? 'margin-left:' + cs.ml + 'px;' : '') + (isNew && motionOK ? 'animation-delay:' + (k++ * 70) + 'ms;' : '') + (layout.port ? 'width:' + cs.cw + 'px;height:' + cs.ch + 'px;' : '');
     return cardHTML(c, { uid: c.uid, live: 1, cost: C.costOf(st, c, i), off: off === 'phase' ? '' : off, deal: isNew && motionOK, sel: selected === c.uid, style: style + (cs.small ? '' : '') });
   }).join('');
   el.classList.toggle('small', !!cs.small);
   // a long effect line on a short card: tighten the type, then drop the tag line, so nothing hangs below the card's border
   fitCards(el);
-  if (!st.hand.length && !layout.port && st.phase !== 'over') el.innerHTML = runStrip();
+  if (!st.hand.length && st.phase !== 'over') { el.innerHTML = runStrip(); if (layout.port) el.firstChild.style.height = cs.rows + 'px'; }   // phones too: the night hand area shows the run, not a hole
+  if (centerFit) centerFit();   // same frame as the new hand: the center never spills onto it, even for one frame
 }
 // Upgrade 2: when the hand is empty on desktop, the lower board shows this run (revenue per day vs the bill pace)
 // and what was played today, instead of a blank strip. Not a .card, never focusable, so tests and the coach ignore it.
@@ -1712,12 +1758,14 @@ function denied(a, e) {
   if (e.why === 'cpu') { say(ic('cpu') + ' Not enough energy for <b>' + esc(d.n) + '</b>. End the day to recharge.', 'bad'); X.pulse($('g-cpu'), 'pulse-bad'); }
   else if (e.why === 'cash') say(ic('cash') + ' <b>' + esc(d.n) + '</b> needs $' + (NEEDCASH[c.id] || '?') + ' cash.', 'bad');
 }
+let nightStrip = '';
 async function doAct(a) {
   if (!st) return;
   if (busy) { if (a.t !== 'play') pending = a; fast = true; return; }
   if (a.t === 'play' && a.uid != null) { a = { t: 'play', i: st.hand.findIndex(c => c.uid === a.uid) }; if (a.i < 0) return; }
   if (a.t === 'end' && st.phase !== 'play') return;
   const dayBefore = st.day;
+  nightStrip = layout.port && a.t === 'end' ? runStrip() : '';   // phones: the emptied hand shows today's run while the night tallies
   const E = C.act(st, a);
   if (E.length === 1 && E[0].t === 'denied') { denied(a, E[0]); return; }
   removeCoach(); selected = -1;
@@ -1822,7 +1870,7 @@ async function playEvents(E) {
       case 'curse': say(ic('curse') + ' <b>' + esc(C.CARDS[e.id].n) + '</b> added to your deck. ' + esc(C.CARDS[e.id].fx.replace(/\{\w+\}/g, '')), 'bad'); S.play('bad'); X.pulse($('g-deck'), 'pulse-bad'); hintOnce('curse', 'Curses hurt if you still hold them at the end of the day. Play them to clear them.'); await wait(420); break;
       case 'msg': say(esc(e.m), 'say'); await wait(520); break;
       case 'held': { const el = view.querySelector('.card[data-uid="' + e.c.uid + '"]'); if (el) { el.classList.remove('nope'); void el.offsetWidth; el.classList.add('nope'); } say(ic('curse') + ' You held <b>' + esc(C.CARDS[e.c.id].n) + '</b>. It bites.', 'bad'); S.play('bad'); await wait(380); break; }
-      case 'discard': if (!discarded) { discarded = true; const h = $('g-hand'); if (h && motionOK) h.classList.add('discarding'); S.play('whoosh'); await wait(260); } break;
+      case 'discard': if (!discarded) { discarded = true; const h = $('g-hand'); if (h && motionOK) h.classList.add('discarding'); S.play('whoosh'); await wait(260); if (h && nightStrip && layout.port) { const hh = h.offsetHeight; h.classList.remove('discarding'); h.innerHTML = nightStrip; h.firstChild.style.height = hh + 'px'; } nightStrip = ''; } break;
       case 'funnel': {
         $('game').classList.add('night'); S.play('night');
         await czOpen(e);
@@ -2080,7 +2128,8 @@ function skipTutorial() {
   toast(ic('book') + ' Tutorial skipped. Replay it any time from How to.', '', 2600);
 }
 let coachHand = null;
-function removeCoach() { if (coachEl) { coachEl.remove(); coachEl = null; } if (coachHand) { coachHand.remove(); coachHand = null; } if (coachTarget) { coachTarget.classList.remove('spot'); coachTarget = null; } }
+function coachUnhide() { document.querySelectorAll('.chid').forEach(e => e.classList.remove('chid')); }
+function removeCoach() { coachUnhide(); if (coachEl) { coachEl.remove(); coachEl = null; } if (coachHand) { coachHand.remove(); coachHand = null; } if (coachTarget) { coachTarget.classList.remove('spot'); coachTarget = null; } }
 function coachOn(target, text, noSpot, hand) {
   removeCoach(); if (!target) return;
   if (hand) { coachHand = document.createElement('div'); coachHand.className = 'chand'; coachHand.setAttribute('aria-hidden', 'true'); coachHand.innerHTML = ic('hand'); }
@@ -2096,26 +2145,40 @@ function placeCoach() {
   const s = host.getBoundingClientRect(), R = e => { const q = e.getBoundingClientRect(); return { l: (q.left - s.left) / k, t: (q.top - s.top) / k, r: (q.right - s.left) / k, b: (q.bottom - s.top) / k }; };
   const T = R(coachTarget), cx = (T.l + T.r) / 2, cy = (T.t + T.b) / 2;
   const W = host === stage ? layout.W : s.width / k, H = host === stage ? layout.H : s.height / k;
-  const w = Math.min(300, W - 20); coachEl.style.maxWidth = w + 'px'; coachEl.classList.remove('below', 'left', 'right');
-  const cw = coachEl.offsetWidth, ch = coachEl.offsetHeight, G = 14;
+  // a banner or the night cascade owns the center panel: the coach waits (hidden) and comes back when it clears (annWatch)
+  const cen = document.getElementById('g-center'), wait = host === stage && cen && cen.classList.contains('ann');
+  coachEl.style.visibility = wait ? 'hidden' : ''; if (coachHand) coachHand.style.visibility = wait ? 'hidden' : ''; if (wait) { coachUnhide(); return; }
+  coachEl.classList.remove('below', 'left', 'right'); const G = 14;
   // things the bubble should not cover (besides its own target)
-  const obs = [...stage.querySelectorAll('#g-hand .card, #g-end, .deckinfo button, #g-cpu, #g-fc, #g-billblk, #g-cashblk, .stat')].filter(e => e !== coachTarget && !coachTarget.contains(e) && !e.contains(coachTarget) && e.offsetParent).map(e => Object.assign(R(e), { w: e.matches('.card, #g-end, .stat') ? 40 : e.matches('#g-cpu, #g-fc, .deckinfo button') ? 2 : 1 }));
-  const cost = (x, y) => { let c = 0; if (x < 6 || y < 6 || x + cw > W - 6 || y + ch > H - 6) c += 1e7; for (const o of obs) { const ox = Math.min(x + cw, o.r) - Math.max(x, o.l), oy = Math.min(y + ch, o.b) - Math.max(y, o.t); if (ox > 0 && oy > 0) c += ox * oy * o.w; } return c; };
+  // Text never sits on other text: real UI (cards, buttons, stats, products, skip) is avoided hard; the center panel's
+  // own lines (bot, its speech bubble, the Tonight forecast) give way instead: whatever the bubble lands on hides until it moves.
+  coachUnhide(); const YIELD = '#g-bot, #g-bubble, #g-fc, .ghostline' + (layout.port ? ', #g-skip2' : '');   // phones: the center's skip link also steps aside (the pause sheet still skips)
+  const obs = [...stage.querySelectorAll('#g-hand .card, #g-end, .deckinfo button, #g-cpu, #g-billblk, #g-cashblk, .stat, #g-prods .prod, #g-tools > *, #g-skip, #g-skip2, .biz .lbl, ' + YIELD)].filter(e => e !== coachTarget && !coachTarget.contains(e) && !e.contains(coachTarget) && e.offsetParent && !(coachEl.parentNode !== stage && coachEl.parentNode.contains(e))).map(e => Object.assign(R(e), { el: e, y: e.matches(YIELD), w: e.matches(YIELD) ? 0.5 : e.matches('.card, #g-end, .stat') ? 40 : 30 }));
+  // try the full width first, then narrower (taller) bubbles, until one covers no real UI at all
+  let best = null; const w0 = Math.min(300, W - 20);
+  for (const w of [w0, Math.round(w0 * 0.8), Math.round(w0 * 0.66)]) { coachEl.style.maxWidth = w + 'px';
+  const cw = coachEl.offsetWidth, ch = coachEl.offsetHeight;
+  let hardA = 0; const cost = (x, y) => { let c = 0; hardA = 0; if (x < 6 || y < 6 || x + cw > W - 6 || y + ch > H - 6) { c += 1e7; hardA = 1e7; } for (const o of obs) { const ox = Math.min(x + cw, o.r) - Math.max(x, o.l), oy = Math.min(y + ch, o.b) - Math.max(y, o.t); if (ox > 0 && oy > 0) { c += ox * oy * o.w; if (!o.y && ox > 2 && oy > 2) hardA += ox * oy; } } return c; };
   const xs = [clamp(cx - cw / 2, 10, W - cw - 10), clamp(T.l, 10, W - cw - 10), clamp(T.r - cw, 10, W - cw - 10)];
   // also try sliding the bubble just clear of each big obstacle (stats column, cards) so it never has to sit on Burnout
-  obs.forEach(o => { if (o.w >= 40) { xs.push(clamp(o.r + 8, 10, W - cw - 10), clamp(o.l - cw - 8, 10, W - cw - 10)); } });
+  obs.forEach(o => { if (o.w >= 30) { xs.push(clamp(o.r + 8, 10, W - cw - 10), clamp(o.l - cw - 8, 10, W - cw - 10)); } });
   const ys = [clamp(cy - ch / 2, 10, H - ch - 10), clamp(T.t, 10, H - ch - 10)];
   const cand = [];
   xs.forEach((x, i) => { const q = Math.min(i, 3) * 0.1; cand.push({ x, y: T.t - ch - G, m: '', p: q }); cand.push({ x, y: T.b + G, m: 'below', p: 0.5 + q }); });
   ys.forEach(y => { cand.push({ x: T.r + G, y, m: 'right', p: 1 }); cand.push({ x: T.l - cw - G, y, m: 'left', p: 1 }); });
   // and just past each big obstacle row above/below the target (the phone stats strip), arrow-less
-  obs.forEach(o => { if (o.w < 40) return; if (o.b + 8 > T.b + G) xs.slice(0, 3).forEach(x => cand.push({ x, y: o.b + 8, m: 'below', p: 0.8, gap: o.b + 8 - T.b - G })); if (o.t - ch - 8 < T.t - ch - G) xs.slice(0, 3).forEach(x => cand.push({ x, y: o.t - ch - 8, m: '', p: 0.8, gap: T.t - ch - G - (o.t - ch - 8) })); });
+  obs.forEach(o => { if (o.w < 30) return; if (o.b + 8 > T.b + G) xs.slice(0, 3).forEach(x => cand.push({ x, y: o.b + 8, m: 'below', p: 0.8, gap: o.b + 8 - T.b - G })); if (o.t - ch - 8 < T.t - ch - G) xs.slice(0, 3).forEach(x => cand.push({ x, y: o.t - ch - 8, m: '', p: 0.8, gap: T.t - ch - G - (o.t - ch - 8) })); });
+  // or arrow-less in the middle of the center panel (desktop), which only ever covers the panel's own yielding lines
+  if (host === stage && cen && cen.offsetParent && !cen.contains(coachTarget)) { const q = R(cen); if (q.r - q.l >= cw && q.b - q.t >= ch) cand.push({ x: (q.l + q.r - cw) / 2, y: (q.t + q.b - ch) / 2, m: '', p: 2, na: 1 }); }
   // how far the arrow would land from the target; the tapping hand already marks the target, so a miss is cheap with it
   const miss = c => { if (c.m === 'left' || c.m === 'right') { const a = clamp(cy, c.y + 14, c.y + ch - 14); return Math.max(0, T.t + 6 - a, a - (T.b - 6)); } const a = clamp(cx, c.x + 16, c.x + cw - 16); return Math.max(0, T.l + 6 - a, a - (T.r - 6)); };
-  let best = null; for (const c of cand) { c.miss = miss(c) + (c.gap || 0); c.c = cost(c.x, c.y) + c.p * 40 + (c.miss - (c.gap || 0)) * (coachHand ? 100 : 400) + (c.gap || 0) * 400; if (!best || c.c < best.c) best = c; }
-  coachEl.classList.remove('noarrow'); if (best.miss > 0) coachEl.classList.add('noarrow');
+  let wb = null; for (const c of cand) { c.miss = miss(c) + (c.gap || 0); c.c = cost(c.x, c.y) + c.p * 40 + (c.miss - (c.gap || 0)) * (coachHand ? 100 : 400) + (c.gap || 0) * 400; c.hard = hardA; c.cw = cw; c.ch = ch; c.w = w; if (!wb || c.c < wb.c) wb = c; }
+  if (!best || wb.hard < best.hard) best = wb; if (!best.hard) break; }
+  coachEl.style.maxWidth = best.w + 'px'; const cw = best.cw, ch = best.ch;
+  coachEl.classList.remove('noarrow'); if (best.miss > 0 || best.na) coachEl.classList.add('noarrow');
   if (best.m) coachEl.classList.add(best.m);
   coachEl.style.left = best.x + 'px'; coachEl.style.top = best.y + 'px';
+  if (host === stage) for (const o of obs) if (o.y && Math.min(best.x + cw, o.r) - Math.max(best.x, o.l) > 1 && Math.min(best.y + ch, o.b) - Math.max(best.y, o.t) > 1) o.el.classList.add('chid');
   if (coachHand) { coachHand.style.left = (cx - 17) + 'px'; coachHand.style.top = (Math.min(T.b - 30, cy + 4)) + 'px'; }
   if (best.m === 'left' || best.m === 'right') coachEl.style.setProperty('--ay', clamp(cy - best.y, 14, ch - 14) + 'px');
   else coachEl.style.setProperty('--ax', clamp(cx - best.x, 16, cw - 16) + 'px');
