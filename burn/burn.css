@@ -650,7 +650,7 @@ input[type=range]{min-height:50px}
 /* phones: up to three offers sit side by side like a hand, not two plus an orphan */
 .port .offers:not(:has(>.offer:nth-child(4))){flex-wrap:nowrap;gap:8px}
 .port .offers:not(:has(>.offer:nth-child(4)))>.offer{flex:1 1 0;min-width:0;max-width:150px}
-.port .offers:not(:has(>.offer:nth-child(4))) .card.big,.port .offers:not(:has(>.offer:nth-child(4))) .toolcard{--cw:100%;--ch:186px;--ah:56px;--nf:14px;--ff:12.5px;width:100%;height:186px}
+.port .offers:not(:has(>.offer:nth-child(4))) .card.big,.port .offers:not(:has(>.offer:nth-child(4))) .toolcard{--cw:100%;--ch:212px;--ah:70px;--nf:14px;--ff:12.5px;width:100%;height:212px}
 /* phone held sideways: whole product names in one column when they fit */
 .phl .prods.one{display:flex;flex-direction:column;flex-wrap:nowrap}
 .phl .prods.one .prod{flex:none;width:100%;min-height:26px}
@@ -694,3 +694,4 @@ input[type=range]{min-height:50px}
 .port .biz .prods{flex:1 1 auto}
 .port .biz.dense2 .prod .ic{display:none}
 .port .biz.dense2 .prod{padding:2px 7px}
+@media (max-width:374px){.port .sheet h2{font-size:20px}}
