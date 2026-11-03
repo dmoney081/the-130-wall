@@ -548,4 +548,5 @@ input[type=range]{min-height:50px}
 .port .stat .body,.short .stat .body{align-self:stretch;width:100%}
 .card.tight .fx{font-size:min(var(--ff,13px),11px);line-height:1.1}.card.tight .nm{font-size:min(var(--nf,14px),12px);line-height:1.05}.card.notag .tagl{display:none}
 .card.tight .desc{font-size:11px;line-height:1.15}
-.card .nm,.card .fx{overflow-wrap:anywhere}
+.toolcard.tight{gap:4px}.toolcard.tight .nm{font-size:14px;line-height:1.05}.toolcard.tight .fx{font-size:11.5px;line-height:1.15}.toolcard.brk .nm,.toolcard.brk .fx{overflow-wrap:anywhere;hyphens:auto;-webkit-hyphens:auto}.toolcard.notag .tagl{display:none}
+.card.brk .nm,.card.brk .fx{overflow-wrap:anywhere;hyphens:auto;-webkit-hyphens:auto}

@@ -1232,7 +1232,7 @@ function openOv(html, opt) {
 }
 function closeOv(o) { o = o || ov; if (!o) return; o.remove(); ovStack = ovStack.filter(x => x !== o); ov = ovStack[ovStack.length - 1] || null; if (o.onclose) o.onclose(); }
 function closeAll() { while (ov) { const o = ov; o.onclose = null; closeOv(o); } }
-function toast(html, cls, ms) { const t = document.createElement('div'); t.className = 'banner show ' + (cls || ''); t.innerHTML = html; const host = annClear() || stage; host.appendChild(t); annFit(t); setTimeout(() => t.remove(), ms || 1000); return t; }
+function toast(html, cls, ms) { const t = document.createElement('div'); t.className = 'banner show ' + (cls || ''); t.innerHTML = html; const host = annClear() || stage; host.appendChild(t); annFit(t); t.addEventListener('animationend', e => { if (e.target === t) t.remove(); }); setTimeout(() => t.remove(), ms || 1000); return t; }
 // announcements (banners, toasts, the night cascade) own the center panel during a game: one at a time, scaled to fit,
 // and the panel's own content (bot, bubble, forecast) is hidden underneath while one shows, so nothing overlaps
 function annClear() { const c = document.getElementById('g-center'); if (!c) return null; if (cz) { cz.el.remove(); cz = null; } c.querySelectorAll(':scope>.banner,:scope>.cascade').forEach(x => x.remove()); return c; }
@@ -1655,7 +1655,11 @@ function renderHand() {
 // Upgrade 2: when the hand is empty on desktop, the lower board shows this run (revenue per day vs the bill pace)
 // and what was played today, instead of a blank strip. Not a .card, never focusable, so tests and the coach ignore it.
 function fitCards(root) {
-  const go = () => { for (const c of root.querySelectorAll('.card')) { if (!c.clientHeight) continue; if (c.scrollHeight > c.clientHeight + 1) c.classList.add('tight'); if (c.scrollHeight > c.clientHeight + 1) c.classList.add('notag'); } };
+  const wide = c => [...c.querySelectorAll('.nm,.fx')].some(x => x.scrollWidth > x.clientWidth + 1);
+  const go = () => { for (const c of root.querySelectorAll('.card,.toolcard')) { if (!c.clientHeight) continue; // tool cards too: long tool text on phones
+    if (c.scrollHeight > c.clientHeight + 1 || wide(c)) c.classList.add('tight');
+    if (wide(c)) c.classList.add('brk'); // a single word wider than the card even at the tight size: let it break
+    if (c.scrollHeight > c.clientHeight + 1) c.classList.add('notag'); } };
   go(); requestAnimationFrame(go); // again after layout settles (fonts, a panel that resized this frame)
 }
 function runStrip() {
